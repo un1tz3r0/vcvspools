@@ -11,7 +11,7 @@ Each top-level item is a minor version (`2.N.0`) and one PR to `main`. Each seco
 
 - [ ] **2.2 Playback proof of concept**
   - [x] 2.2.1 Time base: CLOCK + PPQN, smoothing, manual/loop BPM fallback, beat-phase accumulator
-  - [ ] 2.2.2 `SlicePlayer`: windowed-sinc interpolation (16/8 tap), pitch, start/end trims, reverse, declick
+  - [x] 2.2.2 `SlicePlayer`: windowed-sinc interpolation (16/8 tap), pitch, start/end trims, reverse, declick
   - [ ] 2.2.3 Note-mode sequencer: V/oct offset with wrap, region, length, phrase timing in beats, gate repeat with loop count, direction (fwd/rev/ping-pong/random), launch quantize, retrigger
   - [ ] 2.2.4 Voice: two players, equal-power overlap crossfade, duration, gain/pan, 16-voice poly; SLICE/TRIG/EOC outputs
   - [ ] 2.2.5 Module glue: params, inputs, outputs, file-load menu, JSON persistence, patch-storage embedding (≤5 min) with *Reference file only* option
