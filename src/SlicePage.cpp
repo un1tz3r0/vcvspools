@@ -197,7 +197,7 @@ struct SlicePage : Page {
 		}
 		if (pos.y < v.top || pos.y > v.bottom) return true;
 		const double sr = l.audio->sampleRate;
-		if (pos.y < v.top + kFlag + 2) {  // loop flags along the top
+		if (pos.y < v.top + kFlag + 2 && tailOf(m, l, v.index) != TailMode::Stretch) {  // loop flags along the top
 			auto lp = points(m, l, v.index);
 			if (std::fabs(pos.x - v.x(lp.start)) <= kGrab) { drag = Drag::LoopStart; return true; }
 			if (std::fabs(pos.x - v.x(lp.end)) <= kGrab) { drag = Drag::LoopEnd; return true; }
@@ -304,8 +304,19 @@ struct SlicePage : Page {
 		const TailMode tail = tailOf(m, l, i);
 		const bool searched = tail == TailMode::AutoLoop && hasFeatures && (*l.features)[i].loop.score > 0;
 		const bool manual = !searched && tail != TailMode::AutoLoop && p.hasLoopPoints();
+		const bool stretch = tail == TailMode::Stretch;
 		const float la = fx(lp.start), lb = fx(lp.end);
-		ctx.fillRect(la, top, lb - la, bottom - top, withAlpha(kAccent, manual || searched ? 0.16f : 0.07f));
+		if (!stretch) ctx.fillRect(la, top, lb - la, bottom - top, withAlpha(kAccent, manual || searched ? 0.16f : 0.07f));
+		else {  // the part that is played as grains
+			VoiceParams vp;
+			vp.transientPreserve = m->transientPreserve;
+			vp.stretchTail = m->stretchTail;
+			auto sp = stretchPlan(l, i, SlicePlayer::span(a, l.slices[i].start, l.sliceEnd(i), p.startTrim, p.endTrim, false), vp, 0, 1);
+			const float sa = fx(sp.from), sb = fx(sp.to);
+			ctx.fillRect(sa, top, sb - sa, bottom - top, withAlpha(kAccent, 0.12f));
+			ctx.text((sa + sb) / 2, top + 11, NVG_ALIGN_CENTER | NVG_ALIGN_BASELINE, 11, kText,
+				sp.period > 0 ? string::f("STRETCH  grain %.0f ms", sp.grain / sr * 1000) : "STRETCH  grain 40 ms");
+		}
 
 		for (float x = ax + v.x0; x < ax + v.x1; x += 1.f) {
 			size_t f0 = size_t(v.frame(x - ax)), f1 = std::max(f0 + 1, size_t(v.frame(x + 1 - ax)));
@@ -327,7 +338,7 @@ struct SlicePage : Page {
 			ctx.text(tx + 3, bottom - 3, NVG_ALIGN_LEFT | NVG_ALIGN_BASELINE, 11, kDim, "T");
 		}
 		const NVGcolor flag = manual || searched ? kAccent : withAlpha(kAccent, 0.6f);
-		for (int k = 0; k < 2; k++) {
+		for (int k = 0; k < 2 && !stretch; k++) {
 			const float x = k ? lb : la;
 			ctx.fillRect(x - (k ? 1 : 0), top, 1.5f, bottom - top, flag);
 			nvgBeginPath(vg);
@@ -338,7 +349,7 @@ struct SlicePage : Page {
 			nvgFillColor(vg, flag);
 			nvgFill(vg);
 		}
-		ctx.text((la + lb) / 2, top + 11, NVG_ALIGN_CENTER | NVG_ALIGN_BASELINE, 11, kText,
+		if (!stretch) ctx.text((la + lb) / 2, top + 11, NVG_ALIGN_CENTER | NVG_ALIGN_BASELINE, 11, kText,
 			searched ? string::f("FOUND %.0f%%%s", (*l.features)[i].loop.score * 100, p.pingPong ? " ⇄" : "")
 				: string::f("%s%s", manual ? "LOOP" : "AUTO LOOP", p.pingPong ? " ⇄" : ""));
 		for (bool end : {false, true}) {

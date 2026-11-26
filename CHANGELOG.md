@@ -2,6 +2,12 @@
 
 Versions follow `TODO.md`: each `2.N.p` heading is one task, and the last one in a milestone is the released version.
 
+## 2.7.5
+
+- **Stretch** tail: granular time-stretch and squeeze that fits each slice to its gate at the original pitch (DESIGN §6.5). The attack keeps its timing, and the rest plays as 50 %-overlapping Hann grains. For pitched slices, grains are about three periods long and start a whole number of periods from the grain they overlap, so they reinforce instead of beating. Unpitched slices use 40 ms grains with jitter. The first and last grains join the plain playback at full level.
+- SETTINGS gains **Keep attack** (transient preserve) and **Stretch tail** (tail %), both saved with the patch. The SETTINGS rows are 17 px so all 17 options fit.
+- The SLICE page shades the stretched region and shows the grain size.
+
 ## 2.7.4
 
 - **Auto-loop** tail: each slice's analysis now searches its post-attack audio for a seamless loop (DESIGN §6.5). Candidate lengths are whole pitch periods (or 20 ms upward when the pitch is unclear). They are scored by the correlation, level match and zero-crossing-rate match of the windows before the loop end and start, with a slight preference for longer loops, and snapped to rising zero crossings.

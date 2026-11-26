@@ -36,6 +36,11 @@ std::vector<Setting> moduleSettings(Spools* m) {
 	s.push_back(paramChoice("Playback", "Loop count", m, Spools::LOOP_COUNT_PARAM, loops));
 	s.push_back({"Playback", "Retrigger", {"Each slice", "Each note"},
 		[=] { return size_t(m->retriggerPerNote.load()); }, [=](size_t i) { m->retriggerPerNote = i == 1; }});
+	std::vector<std::string> pct = {"0%", "25%", "50%", "75%", "100%"};
+	std::vector<float> frac = {0, 0.25f, 0.5f, 0.75f, 1};
+	s.push_back(choice<float>("Playback", "Keep attack", pct, frac,
+		[=] { return m->transientPreserve.load(); }, [=](float v) { m->transientPreserve = v; }));
+	s.push_back(choice<float>("Playback", "Stretch tail", pct, frac, [=] { return m->stretchTail.load(); }, [=](float v) { m->stretchTail = v; }));
 	s.push_back(choice<float>("Playback", "Loop xfade", {"Off", "2 ms", "5 ms", "10 ms", "20 ms", "50 ms", "100 ms"},
 		{0, 0.002f, 0.005f, 0.01f, 0.02f, 0.05f, 0.1f}, [=] { return m->loopXfade.load(); }, [=](float v) { m->loopXfade = v; }));
 
@@ -44,8 +49,6 @@ std::vector<Setting> moduleSettings(Spools* m) {
 		[=] { return int(m->slicing.mode); }, [=](int v) { m->slicing.mode = spools::SliceMode(v); reslice(); }));
 	s.push_back(choice<double>("Slicing", "Grid", {"1/4", "1/8", "1/16", "1/32", "1/8 T", "1/16 T"}, {1, 0.5, 0.25, 0.125, 1.0 / 3, 1.0 / 6},
 		[=] { return m->slicing.gridBeats; }, [=](double v) { m->slicing.gridBeats = v; reslice(); }));
-	std::vector<std::string> pct = {"0%", "25%", "50%", "75%", "100%"};
-	std::vector<float> frac = {0, 0.25f, 0.5f, 0.75f, 1};
 	s.push_back(choice<float>("Slicing", "Sensitivity", pct, frac,
 		[=] { return m->slicing.sensitivity; }, [=](float v) { m->slicing.sensitivity = v; reslice(); }));
 	s.push_back(choice<float>("Slicing", "Grid snap", pct, frac,

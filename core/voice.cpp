@@ -40,6 +40,25 @@ SlicePlayer::LoopPoints loopPoints(const Loop& l, size_t i, const SlicePlayer::S
 	return lp;
 }
 
+SlicePlayer::StretchPlan stretchPlan(const Loop& l, size_t i, const SlicePlayer::Span& span, const VoiceParams& vp,
+	double samples, double rate) {
+	const Slice& s = l.slices[i];
+	const double sr = l.audio->sampleRate;
+	const SliceFeatures* f = l.features && i < l.features->size() ? &(*l.features)[i] : nullptr;
+	const double attackEnd = double(s.start) + (f ? double(f->transientEnd) : 0.25 * double(l.sliceEnd(i) - s.start));
+	const double kept = span.start + std::max(0.0, attackEnd - span.start) * std::clamp(vp.transientPreserve, 0.f, 1.f);
+	SlicePlayer::StretchPlan p;
+	p.to = span.end;
+	p.from = std::min(span.end, span.end - std::clamp(vp.stretchTail, 0.f, 1.f) * std::max(0.0, span.end - kept));
+	p.outSamples = samples - (p.from - span.start) / rate;
+	const bool pitched = f && f->pitch.period > 0 && f->pitch.confidence > 0.5f;
+	p.period = pitched ? f->pitch.period : 0;
+	// About three periods, kept to 10..100 ms and to whole periods; 40 ms without a pitch.
+	p.grain = pitched ? std::max(1.0, std::round(std::clamp(3 * p.period, 0.01 * sr, 0.1 * sr) / p.period)) * p.period : 0.04 * sr;
+	p.seed = uint32_t(i * 2654435761u + 1);
+	return p;
+}
+
 void Voice::begin(int slice, bool phraseStart, double slotSeconds, const Loop& l, const VoiceParams& vp, float engineRate) {
 	const Slice& s = l.slices[size_t(slice)];
 	const Resolved r = resolve(vp, s.p);
@@ -59,7 +78,10 @@ void Voice::begin(int slice, bool phraseStart, double slotSeconds, const Loop& l
 	rateBase = l.audio->sampleRate / engineRate;
 	players[cur].setQuality(vp.quality);
 	players[cur].start(l.audio.get(), span, rateBase * semitonesToRatio(r.pitch), engineRate);
+	const double gate = slotSeconds * std::clamp(vp.duration, 0.05f, 1.f);
 	if (r.tail == TailMode::Loop || r.tail == TailMode::AutoLoop) players[cur].setLoop(loopPoints(l, size_t(slice), span, vp, r.tail));
+	if (r.tail == TailMode::Stretch)
+		players[cur].setStretch(stretchPlan(l, size_t(slice), span, vp, gate * engineRate, rateBase * semitonesToRatio(r.pitch)));
 	sliceOf[cur] = slice;
 
 	if (l.audio->channels == 1) {  // equal-power pan, unity at centre
@@ -72,7 +94,7 @@ void Voice::begin(int slice, bool phraseStart, double slotSeconds, const Loop& l
 		panR[cur] = std::min(1.f, 1 + r.pan);
 	}
 	// Every mode but Ring is gated at DURATION x the slot; Ring plays until the next slice or the note ends.
-	slotLeft = r.tail != TailMode::Ring ? slotSeconds * std::clamp(vp.duration, 0.05f, 1.f) : -1;
+	slotLeft = r.tail != TailMode::Ring ? gate : -1;
 	lastSlice = slice;
 	released = false;
 	loop = &l;

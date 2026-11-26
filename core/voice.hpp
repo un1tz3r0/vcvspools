@@ -24,6 +24,8 @@ struct VoiceParams {
 	AdsrTimes ampEnv, filterEnv{0, 0.3f, 0, 0.1f};
 	float filterEnvAmount = 0;         // octaves at full envelope, -5..5
 	float loopXfade = 0.01f;           // seconds, Loop tail crossfade
+	float transientPreserve = 1;       // Stretch: fraction of the attack kept at native timing
+	float stretchTail = 1;             // Stretch: fraction of the post-attack audio that may be stretched
 	bool retriggerPerNote = false;     // envelopes restart on each slice unless set
 	const SincTable* quality = &SincTable::hq();
 };
@@ -39,6 +41,10 @@ struct VoiceOut {
 // are not ready) to the end of the span. AutoLoop: the searched loop, else as Loop without manual points.
 SlicePlayer::LoopPoints loopPoints(const Loop& l, size_t i, const SlicePlayer::Span& span, const VoiceParams& vp,
 	TailMode tail = TailMode::Loop);
+
+// Stretch-tail plan for slice i to last `samples` engine samples at `rate` source frames per sample.
+SlicePlayer::StretchPlan stretchPlan(const Loop& l, size_t i, const SlicePlayer::Span& span, const VoiceParams& vp,
+	double samples, double rate);
 
 // One note-mode voice: a phrase sequencer driving two slice players so a new slice can start
 // while the previous one fades out underneath it.
