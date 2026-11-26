@@ -41,21 +41,21 @@ Each top-level item is a minor version (`2.N.0`) and one PR to `main`. Each seco
   - [x] 2.6.5 Selection editing: knob retargeting to the selection mean, relative multi-edit, shift-click = set to mean, spread ring
   - [x] 2.6.6 Crop view with handles
 
-- [ ] **2.7 Tail modes**
+- [x] **2.7 Tail modes**
   - [x] 2.7.1 Per-slice features: transient end, YIN fundamental period with confidence
   - [x] 2.7.2 Cut and Ring modes
-  - [ ] 2.7.3 Manual Loop mode (forward/ping-pong, crossfade) + Slice page with loop-point handles
-  - [ ] 2.7.4 Auto-loop point search (period multiples, coherence score, zero-crossing snap)
-  - [ ] 2.7.5 Granular stretch/squeeze with transient preserve and tail %
+  - [x] 2.7.3 Manual Loop mode (forward/ping-pong, crossfade) + Slice page with loop-point handles
+  - [x] 2.7.4 Auto-loop point search (period multiples, coherence score, zero-crossing snap)
+  - [x] 2.7.5 Granular stretch/squeeze with transient preserve and tail %
 
-- [ ] **2.8 Performance and polish**
-  - [ ] 2.8.1 `make bench`; eco interpolation; skip idle voices; reach the CPU target
-  - [ ] 2.8.2 User manual in `docs/`, panel screenshots, README update
+- [x] **2.8 Performance and polish**
+  - [x] 2.8.1 `make bench`; eco interpolation; skip idle voices; reach the CPU target
+  - [x] 2.8.2 User manual in `docs/`, panel screenshots, README update
 
-- [ ] **2.9 Slice remap sequencer (Pattern mode)**
-  - [ ] 2.9.1 Pattern model and step playback: order, length/nudge, duration, reverse, pitch
-  - [ ] 2.9.2 Ratchets with rate curve and velocity ramps; pattern loop/count/direction
-  - [ ] 2.9.3 Pattern page editor and menu actions; persistence in JSON and `spls`
+- [x] **2.9 Slice remap sequencer (Pattern mode)**
+  - [x] 2.9.1 Pattern model and step playback: order, length/nudge, duration, reverse, pitch
+  - [x] 2.9.2 Ratchets with rate curve and velocity ramps; pattern loop/count/direction
+  - [x] 2.9.3 Pattern page editor and menu actions; persistence in JSON and `spls`
 
 - [ ] **2.10 Per-slice sends and CV**
   - [ ] 2.10.1 FX send A/B outputs with per-slice levels

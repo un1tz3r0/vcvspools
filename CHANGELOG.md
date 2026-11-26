@@ -2,6 +2,73 @@
 
 Versions follow `TODO.md`: each `2.N.p` heading is one task, and the last one in a milestone is the released version.
 
+## 2.9.3
+
+- **PATTERN** page:
+  - steps drawn as blocks sized by length and tinted by slice;
+  - drag a step to change its slice, Alt-drag for velocity, drag its edge for length, scroll for ratchets;
+  - drag tabs to set the play range;
+  - double-click to duplicate or add a step, Ctrl-double-click to delete;
+  - fields for every step setting;
+  - a marker under each step that a voice is playing.
+- Right-click → **Pattern**: Init from loop, Shuffle slices, Reverse steps, Add rest, Delete step, Play every step, Direction and Loop count.
+- The pattern now belongs to the loop. Pattern edits go through the same publish and undo path as slice edits. The pattern is saved in the patch and, with per-slice settings, in the embedded WAV's `spls` chunk, which is read back on load. Before this, the manual said per-slice settings went into `spls`, but nothing wrote them.
+
+## 2.9.2
+
+- Ratchets: a pattern step can play its slice 1–8 times within its length. The ratchet curve spaces the hits evenly (0), as a roll that speeds up (> 0) or one that slows down (< 0). Each hit is gated for its own share of the step.
+- Velocity: each step sets a level for its first hit, and a ramp moves later hits up or down from it. The level follows into the voice's gain without breaking the per-slice level glide.
+- A random pass picks a step once per slot, so all its ratchet hits play the same step.
+
+## 2.9.1
+
+- **Pattern mode** (SETTINGS → Mode → Pattern), the third play mode, runs on the loop-mode transport. A pattern (`core/pattern.hpp`) has steps, each with:
+  - a slice or a rest;
+  - a length in 1/32-note ticks and a ± nudge;
+  - a gate length, reverse and a pitch offset.
+
+  Each pattern also has a loop range, a loop count and a direction.
+- `PatternSequencer` sets its position from the transport's loop beat, like loop mode. V/OCT shifts every step's slice. Reverse and ping-pong passes play the steps, and their lengths, backwards. Random picks each slot's step. Rests release the voice.
+- A step's gate length, pitch and reverse are added to the slice's own settings, and the pitch keeps following knob changes.
+- A pattern is made from the loop, one step per slice, whenever a new file loads. The editor and saving come in 2.9.3.
+
+## 2.8.2
+
+- Manual:
+  - an introduction;
+  - an Inputs table with every CV scaling;
+  - a Tail modes section covering all five modes;
+  - an Engine section on interpolation quality and CPU use;
+  - pictures of the panel and the SLICE page.
+- README: a feature summary and images of the panel and the three display pages. The images are 100%-scale previews rendered from the layout code, not Rack screenshots yet. `make bench` is now in the build notes.
+
+## 2.8.1
+
+- `make bench`: 16 voices at 48 kHz in Ring, Auto-loop and Stretch modes, best and eco quality, with and without a filter, plus an idle case. It uses Rack's optimisation flags and reports % of one core and ns per voice-sample (results in docs/development.md).
+- About twice as fast as 2.7.5:
+  - one sinc kernel lookup per frame instead of one per channel, with the cutoff band cached per rate and fixed-size dot products;
+  - envelope, glide and filter coefficients recomputed only when their inputs change;
+  - a Hann table for grains;
+  - voices that have been silent for 0.1 s skip everything but their envelopes.
+- On the 2.1 GHz development VM, Ring uses 3.2 % of one core and Stretch about 4.5–5 %, which is just over the 3 % target. It hasn't been measured on a desktop CPU yet.
+
+## 2.7.5
+
+- **Stretch** tail: granular time-stretch and squeeze that fits each slice to its gate at the original pitch (DESIGN §6.5). The attack keeps its timing, and the rest plays as 50 %-overlapping Hann grains. For pitched slices, grains are about three periods long and start a whole number of periods from the grain they overlap, so they reinforce instead of beating. Unpitched slices use 40 ms grains with jitter. The first and last grains join the plain playback at full level.
+- SETTINGS gains **Keep attack** (transient preserve) and **Stretch tail** (tail %), both saved with the patch. The SETTINGS rows are 17 px so all 17 options fit.
+- The SLICE page shades the stretched region and shows the grain size.
+
+## 2.7.4
+
+- **Auto-loop** tail: each slice's analysis now searches its post-attack audio for a seamless loop (DESIGN §6.5). Candidate lengths are whole pitch periods (or 20 ms upward when the pitch is unclear). They are scored by the correlation, level match and zero-crossing-rate match of the windows before the loop end and start, with a slight preference for longer loops, and snapped to rising zero crossings.
+- The SLICE page shows the found loop and its score. Dragging a loop flag in Auto-loop switches the slice to Loop with manual points.
+
+## 2.7.3
+
+- **Loop** tail: after its attack, a slice repeats a loop region until its gate ends. The region is set by hand or found automatically (transient end to slice end). Loops play forward with a raised-cosine crossfade into the audio before the loop start (SETTINGS → **Loop xfade**, 10 ms by default), or ping-pong. Reversed slices don't loop.
+- New **SLICE** page: a close-up of one slice with its trims, transient end and draggable loop flags, plus its per-slice settings as fields (drag numbers, click choices). The ‹ › buttons in the tab row step through slices.
+- Loop points and the ping-pong flag are saved with the patch.
+
 ## 2.7.2
 
 - Cut and Ring follow DESIGN §6.5 and have tests for both cases. When the slot is longer than the audio, the slice plays once with no click. When it is shorter, the slice fades at the slot end over the overlap time.

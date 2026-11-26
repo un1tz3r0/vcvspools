@@ -249,3 +249,90 @@ TEST_CASE("tail modes when the slot and the audio differ in length") {
 	auto rs = render(vs, *l, p, ring, 0.25, 14000);
 	CHECK(rs.l[7000] == 0.f);
 }
+
+TEST_CASE("Loop tail sustains a slice through a long slot, from its own loop points when set") {
+	auto loop = steps();
+	PhraseParams p;
+	p.length = 1;
+	VoiceParams vp;
+	vp.tail = TailMode::Loop;
+	Voice v;
+	auto r = render(v, *loop, p, vp, 0.5, 30000);  // slot 24000, audio 12000
+	CHECK(r.l[11000] == doctest::Approx(0.1f).epsilon(0.01));
+	CHECK(r.l[20000] == doctest::Approx(0.1f).epsilon(0.01));  // still looping past the audio end
+	CHECK(r.l[25000] == 0.f);                                  // gated at the slot end
+
+	auto l = std::make_shared<Loop>(*loop);
+	l->slices[0].p.loopStart = 0.1f;
+	l->slices[0].p.loopEnd = 0.2f;
+	l->slices[0].p.pingPong = true;
+	auto lp = loopPoints(*l, 0, SlicePlayer::span(*l->audio, 0, 12000, 0, 0, false), vp);
+	CHECK(lp.start == doctest::Approx(4800));
+	CHECK(lp.end == doctest::Approx(9600));
+	CHECK(lp.pingPong);
+	auto a = loopPoints(*loop, 0, SlicePlayer::span(*loop->audio, 0, 12000, 0, 0, false), vp);
+	CHECK(a.start == 3000);  // no features yet: a quarter in
+	CHECK(a.end == 12000);
+}
+
+// One 0.25 s slice: a loud 10 ms attack settling into a 220 Hz tone at 0.15, analysed.
+static std::shared_ptr<Loop> pluck() {
+	auto a = std::make_shared<Audio>();
+	a->sampleRate = 48000;
+	a->channels = 1;
+	a->frames = 12000;
+	for (size_t i = 0; i < a->frames; i++) {
+		double t = i / 48000.0;
+		a->data[0].push_back(float(0.15 * std::sin(2 * M_PI * 220 * t) * (t < 0.01 ? 4 - 3 * t / 0.01 : 1)));
+	}
+	auto l = std::make_shared<Loop>(*makeLoop(a, {0, 12000}, 240, true, {}));
+	l->features = std::make_shared<const std::vector<SliceFeatures>>(analyzeSlices(*l));
+	return l;
+}
+
+TEST_CASE("Auto-loop tail sustains a pitched slice seamlessly on its searched loop") {
+	auto l = pluck();
+	REQUIRE((*l->features)[0].loop.score > 0.9f);
+	PhraseParams p;
+	p.length = 1;
+	VoiceParams vp;
+	vp.tail = TailMode::AutoLoop;
+	Voice v;
+	auto r = render(v, *l, p, vp, 0.5, 30000);  // slot 24000, audio 12000
+	float maxStep = 0, peak = 0;
+	for (size_t i = 2000; i < 23000; i++) {
+		maxStep = std::max(maxStep, std::fabs(r.l[i + 1] - r.l[i]));
+		if (i > 14000) peak = std::max(peak, std::fabs(r.l[i]));
+	}
+	CHECK(maxStep < 0.006f);  // a 220 Hz sine at 0.15 moves at most 0.0043 per sample
+	CHECK(peak == doctest::Approx(0.15f).epsilon(0.03));
+	CHECK(r.l[25000] == 0.f);
+}
+
+TEST_CASE("Stretch tail fills the slot, keeping the attack's timing and the pitch") {
+	auto l = pluck();
+	PhraseParams p;
+	p.length = 1;
+	VoiceParams vp;
+	vp.tail = TailMode::Stretch;
+	for (double beat : {0.5, 0.15}) {  // slot 24000 (stretch) and 7200 (squeeze); audio 12000
+		Voice v;
+		const size_t slot = size_t(48000 * beat);
+		auto r = render(v, *l, p, vp, beat, slot + 4000);
+		CHECK(std::fabs(r.l[200]) > 0.3f * std::fabs(l->audio->data[0][200]));  // attack plays as recorded
+		float maxStep = 0, peak = 0;
+		for (size_t i = 1000; i < slot - 600; i++) maxStep = std::max(maxStep, std::fabs(r.l[i + 1] - r.l[i]));
+		for (size_t i = slot - 1200; i < slot - 600; i++) peak = std::max(peak, std::fabs(r.l[i]));
+		CHECK(maxStep < 0.03f);
+		CHECK(peak == doctest::Approx(0.15f).epsilon(0.05));  // still sounding just before the slot ends
+		CHECK(r.l[slot + 1000] == 0.f);
+	}
+	auto plan = stretchPlan(*l, 0, SlicePlayer::span(*l->audio, 0, 12000, 0, 0, false), vp, 24000, 1);
+	CHECK(plan.period == doctest::Approx(48000 / 220.0).epsilon(0.01));
+	CHECK(plan.from == doctest::Approx(double((*l->features)[0].transientEnd)));
+	vp.stretchTail = 0.5f;
+	vp.transientPreserve = 0;
+	auto half = stretchPlan(*l, 0, SlicePlayer::span(*l->audio, 0, 12000, 0, 0, false), vp, 24000, 1);
+	CHECK(half.from == doctest::Approx(6000));  // only the second half of the slice is stretched
+	CHECK(half.outSamples == doctest::Approx(18000));
+}

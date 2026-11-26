@@ -22,12 +22,11 @@ SincTable::SincTable(int taps) : n(taps), table(size_t(kNumCutoffs) * (kPhases +
 		}
 }
 
-const float* SincTable::kernel(double frac, double rate) const {
+int SincTable::band(double rate) const {
 	int c = 0;
 	double want = rate > 1 ? 1 / rate : 1;
 	while (c + 1 < kNumCutoffs && kCutoffs[c] > want + 1e-6) c++;
-	int p = int(frac * kPhases + 0.5);
-	return &table[(size_t(c) * (kPhases + 1) + p) * n];
+	return c;
 }
 
 const SincTable& SincTable::hq() { static const SincTable t(16); return t; }

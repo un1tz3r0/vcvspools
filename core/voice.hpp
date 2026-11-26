@@ -23,6 +23,9 @@ struct VoiceParams {
 	float res = 0;                     // 0..1
 	AdsrTimes ampEnv, filterEnv{0, 0.3f, 0, 0.1f};
 	float filterEnvAmount = 0;         // octaves at full envelope, -5..5
+	float loopXfade = 0.01f;           // seconds, Loop tail crossfade
+	float transientPreserve = 1;       // Stretch: fraction of the attack kept at native timing
+	float stretchTail = 1;             // Stretch: fraction of the post-attack audio that may be stretched
 	bool retriggerPerNote = false;     // envelopes restart on each slice unless set
 	const SincTable* quality = &SincTable::hq();
 };
@@ -33,6 +36,15 @@ struct VoiceOut {
 	bool trig = false, eoc = false, playing = false;
 	float ampEnv = 0, filterEnv = 0;
 };
+
+// Loop points for slice i. Loop: its manual points, else from the transient end (a quarter in when features
+// are not ready) to the end of the span. AutoLoop: the searched loop, else as Loop without manual points.
+SlicePlayer::LoopPoints loopPoints(const Loop& l, size_t i, const SlicePlayer::Span& span, const VoiceParams& vp,
+	TailMode tail = TailMode::Loop);
+
+// Stretch-tail plan for slice i to last `samples` engine samples at `rate` source frames per sample.
+SlicePlayer::StretchPlan stretchPlan(const Loop& l, size_t i, const SlicePlayer::Span& span, const VoiceParams& vp,
+	double samples, double rate);
 
 // One note-mode voice: a phrase sequencer driving two slice players so a new slice can start
 // while the previous one fades out underneath it.
@@ -56,6 +68,13 @@ private:
 	Smoother gain[2], pitch, cutoff, res;    // gain is linear
 	int controlCountdown = 0, targetCountdown = 0;
 	bool released = false;
+	// Cached control-rate work: the glide coefficient, the last pitch sent and the last filter setting.
+	float glideRate = 0, glideCoef = 0, lastPitch = 0;
+	struct { FilterType type = FilterType::Off; float cutoff = -99, res = -1, rate = 0; } filterSet;
+	float eventPitch = 0;  // the playing pattern step's pitch offset
+	float velocity[2] = {1, 1};  // each player's step velocity
+	int quiet = 0;  // samples of silence with no player active
+	static constexpr int kQuietAfter = 4800;  // the filter's tail at the highest resonance is shorter
 	const Loop* loop = nullptr;
 	VoiceFilter filter;
 	Adsr amp[2], fenv;  // one amp envelope per player, so an outgoing slice keeps its own
@@ -64,7 +83,7 @@ private:
 	static constexpr float kGlide = 0.005f;
 	void updateTargets(const Loop& l, const VoiceParams& vp);
 
-	void begin(int slice, bool phraseStart, double slotSeconds, const Loop& l, const VoiceParams& vp, float engineRate);
+	void begin(const SeqEvent& e, double slotSeconds, const Loop& l, const VoiceParams& vp, float engineRate);
 	void noteOff(const VoiceParams& vp);
 };
 

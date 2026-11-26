@@ -1,5 +1,6 @@
 #pragma once
 #include "audio.hpp"
+#include <cstdint>
 #include "sinc.hpp"
 
 namespace spools {
@@ -17,9 +18,29 @@ public:
 	// Trims are in seconds (positive moves later) and are clamped to the audio.
 	static Span span(const Audio& a, size_t start, size_t end, float startTrim, float endTrim, bool reverse);
 
+	struct LoopPoints {
+		double start = 0, end = 0;  // source frames inside the span
+		bool pingPong = false;
+		double xfade = 0;           // frames; forward loops only
+	};
+
+	// Granular stretch/squeeze: from source frame `from`, the rest of the span up to `to` is played as
+	// overlapping Hann grains of `grain` source frames, spread over `outSamples` engine samples. Grains keep
+	// the playback rate, so pitch is unchanged. With a period, grain starts stay in phase with each other.
+	struct StretchPlan {
+		double from = 0, to = 0, outSamples = 0, grain = 0, period = 0;
+		uint32_t seed = 1;
+	};
+
 	void start(const Audio* audio, Span s, double rate, float engineRate);
-	void setRate(double r) { rate = r; }
-	void setQuality(const SincTable* t) { sinc = t; }
+	// Forward spans only; returns false (and plays normally) when the region or the time is too short.
+	bool setStretch(const StretchPlan& plan);
+	bool stretching() const { return stretchOn; }
+	// Loops [start, end) until stop(); forward spans only. Call right after start().
+	void setLoop(LoopPoints lp);
+	bool looping() const { return loopOn; }
+	void setRate(double r) { if (r != rate) { rate = r; band = sinc->band(r); } }
+	void setQuality(const SincTable* t) { sinc = t; band = t->band(rate); }
 	// Fades out over `seconds` (at least the declick time) and goes idle.
 	void stop(float seconds = kDeclick);
 
@@ -37,8 +58,22 @@ private:
 	const SincTable* sinc = &SincTable::hq();
 	Span s;
 	double pos = 0, rate = 1;
+	LoopPoints lp;
+	bool loopOn = false;
+	double dir = 1;
 	float gain = 0, fadeStep = 0, declickStep = 0, sampleRate = 48000;
-	float read(int channel, double x) const;
+	int band = 0;  // sinc cutoff for the current rate
+	void read(double x, float& l, float& r) const;  // both channels (r = l for mono)
+
+	struct Grain { double src = 0, done = 0; bool active = false, first = false, last = false; };
+	StretchPlan st;
+	Grain grains[2];
+	bool stretchOn = false, inGrains = false, spawnDone = false;
+	double outDone = 0, nextSpawn = 0;
+	int newest = 0;
+	uint32_t rng = 1;
+	void spawn();
+	void processGrains(float& l, float& r);
 };
 
 }

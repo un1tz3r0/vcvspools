@@ -6,6 +6,7 @@
 #include <string>
 #include "plugin.hpp"
 #include "core/exchange.hpp"
+#include "core/pattern.hpp"
 #include "core/length.hpp"
 #include "core/loop.hpp"
 #include "core/slicing.hpp"
@@ -22,10 +23,16 @@ struct SavedLoop {
 	int meterNum = 4, meterDen = 4;
 	std::vector<spools::Slice> slices;
 	size_t regionStart = 0, regionEnd = 0;
+	std::shared_ptr<const spools::Pattern> pattern;
 };
 
 json_t* sliceParamsToJson(const spools::SliceParams& p);
 void sliceParamsFromJson(json_t* j, spools::SliceParams& p);
+json_t* patternToJson(const spools::Pattern& p);
+spools::Pattern patternFromJson(json_t* j);
+// The `spls` WAV chunk: per-slice settings and the pattern, as JSON.
+std::string splsChunk(const spools::Loop& l);
+void applySpls(spools::Loop& l);
 
 // Tail modes offered for the TAIL setting, in menu order (DESIGN §6.5).
 struct TailChoice { spools::TailMode mode; const char* name; };
@@ -71,14 +78,22 @@ struct Spools : Module {
 	std::atomic<bool> eco{false};
 	std::atomic<bool> embedAudio{true};
 	std::atomic<bool> retriggerPerNote{false};
-	static constexpr int kNoteMode = 0, kLoopMode = 1;
+	std::atomic<float> loopXfade{0.01f};  // seconds
+	std::atomic<float> transientPreserve{1}, stretchTail{1};  // Stretch tail, 0..1
+	static constexpr int kNoteMode = 0, kLoopMode = 1, kPatternMode = 2;
 	std::atomic<int> playMode{kNoteMode};
-	bool wasLoopMode = false;  // audio thread
+	int wasMode = kNoteMode;  // audio thread
 	spools::LoopSequencer loopSeqs[kMaxVoices];
+	spools::PatternSequencer patternSeqs[kMaxVoices];
+	void ensurePattern();  // UI thread: gives the loop a pattern made from its slices when it has none
+	// The current loop with `p` as its pattern; publishes it and records an undo step unless `publishOnly`.
+	std::shared_ptr<const spools::Loop> setPattern(std::shared_ptr<const spools::Loop> base, spools::Pattern p,
+		const std::string& name, bool publishOnly = false);
 	std::atomic<float> barBeats{0};      // 0 = from the loop's meter
 	std::atomic<int> barsPerCycle{0};
 	// Display state (UI thread).
 	int displayPage = 0;
+	int patternStep = 0;  // step being edited on the PATTERN page
 	float viewStart = 0, viewSpan = 1;  // visible part of the loop, as fractions of its length
 	bool cropView = false;              // LOOP page shows the whole source file with crop handles
 	std::vector<size_t> selection;      // sorted slice indices
@@ -115,6 +130,7 @@ struct Spools : Module {
 
 	// Display feedback from the audio thread.
 	std::atomic<int> playingSlice[kMaxVoices];
+	std::atomic<int> playingStep[kMaxVoices];  // pattern step sounding, or -1
 	std::atomic<float> playheads[kMaxVoices];  // source frame, < 0 when idle
 	std::atomic<int> activeChannels{0};
 	std::atomic<float> currentBpm{120};

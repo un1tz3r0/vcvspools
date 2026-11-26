@@ -1,4 +1,4 @@
-ifneq ($(filter test,$(MAKECMDGOALS)),)
+ifneq ($(filter test bench,$(MAKECMDGOALS)),)
 include tests.mk
 else
 RACK_DIR ?= ../Rack-SDK

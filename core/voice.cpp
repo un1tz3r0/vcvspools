@@ -16,11 +16,59 @@ void Voice::reset() {
 	amp[0].reset();
 	amp[1].reset();
 	fenv.reset();
+	quiet = 0;
+	filterSet = {};
 }
 
-void Voice::begin(int slice, bool phraseStart, double slotSeconds, const Loop& l, const VoiceParams& vp, float engineRate) {
+SlicePlayer::LoopPoints loopPoints(const Loop& l, size_t i, const SlicePlayer::Span& span, const VoiceParams& vp, TailMode tail) {
+	const Slice& s = l.slices[i];
+	const double sr = l.audio->sampleRate, from = double(s.start);
+	SlicePlayer::LoopPoints lp;
+	lp.pingPong = s.p.pingPong;
+	lp.xfade = vp.loopXfade * sr;
+	const bool known = l.features && i < l.features->size();
+	if (tail == TailMode::AutoLoop && known && (*l.features)[i].loop.score > 0) {
+		lp.start = from + double((*l.features)[i].loop.start);
+		lp.end = from + double((*l.features)[i].loop.end);
+	}
+	else if (tail != TailMode::AutoLoop && s.p.hasLoopPoints()) {
+		lp.start = from + s.p.loopStart * sr;
+		lp.end = from + s.p.loopEnd * sr;
+	}
+	else {
+		lp.start = known ? from + double((*l.features)[i].transientEnd) : span.start + (span.end - span.start) / 4;
+		lp.end = span.end;
+	}
+	return lp;
+}
+
+SlicePlayer::StretchPlan stretchPlan(const Loop& l, size_t i, const SlicePlayer::Span& span, const VoiceParams& vp,
+	double samples, double rate) {
+	const Slice& s = l.slices[i];
+	const double sr = l.audio->sampleRate;
+	const SliceFeatures* f = l.features && i < l.features->size() ? &(*l.features)[i] : nullptr;
+	const double attackEnd = double(s.start) + (f ? double(f->transientEnd) : 0.25 * double(l.sliceEnd(i) - s.start));
+	const double kept = span.start + std::max(0.0, attackEnd - span.start) * std::clamp(vp.transientPreserve, 0.f, 1.f);
+	SlicePlayer::StretchPlan p;
+	p.to = span.end;
+	p.from = std::min(span.end, span.end - std::clamp(vp.stretchTail, 0.f, 1.f) * std::max(0.0, span.end - kept));
+	p.outSamples = samples - (p.from - span.start) / rate;
+	const bool pitched = f && f->pitch.period > 0 && f->pitch.confidence > 0.5f;
+	p.period = pitched ? f->pitch.period : 0;
+	// About three periods, kept to 10..100 ms and to whole periods; 40 ms without a pitch.
+	p.grain = pitched ? std::max(1.0, std::round(std::clamp(3 * p.period, 0.01 * sr, 0.1 * sr) / p.period)) * p.period : 0.04 * sr;
+	p.seed = uint32_t(i * 2654435761u + 1);
+	return p;
+}
+
+void Voice::begin(const SeqEvent& e, double slotSeconds, const Loop& l, const VoiceParams& vp, float engineRate) {
+	const int slice = e.slice;
+	const bool phraseStart = e.phraseStart;
 	const Slice& s = l.slices[size_t(slice)];
-	const Resolved r = resolve(vp, s.p);
+	Resolved r = resolve(vp, s.p);
+	eventPitch = e.pitch;
+	r.pitch = std::clamp(r.pitch + e.pitch, -48.f, 48.f);
+	r.reverse = r.reverse != e.reverse;
 	players[cur].stop(r.fade);
 	const int prev = cur;
 	cur ^= 1;
@@ -32,11 +80,18 @@ void Voice::begin(int slice, bool phraseStart, double slotSeconds, const Loop& l
 
 	auto span = SlicePlayer::span(*l.audio, s.start, l.sliceEnd(size_t(slice)), r.startTrim, r.endTrim, r.reverse);
 	pitch.snap(r.pitch);  // a new slice starts at its own pitch; only changes while it plays glide
-	gain[cur].snap(dbToGain(r.gain));
+	velocity[cur] = e.gain;
+	gain[cur].snap(dbToGain(r.gain) * e.gain);
 	if (sliceOf[0] < 0 && sliceOf[1] < 0) { cutoff.snap(r.cutoff); res.snap(r.res); }  // first note: no sweep in
 	rateBase = l.audio->sampleRate / engineRate;
 	players[cur].setQuality(vp.quality);
 	players[cur].start(l.audio.get(), span, rateBase * semitonesToRatio(r.pitch), engineRate);
+	const double gate = slotSeconds * std::clamp(vp.duration * e.duration, 0.05f, 1.f);
+	lastPitch = r.pitch;
+	quiet = 0;
+	if (r.tail == TailMode::Loop || r.tail == TailMode::AutoLoop) players[cur].setLoop(loopPoints(l, size_t(slice), span, vp, r.tail));
+	if (r.tail == TailMode::Stretch)
+		players[cur].setStretch(stretchPlan(l, size_t(slice), span, vp, gate * engineRate, rateBase * semitonesToRatio(r.pitch)));
 	sliceOf[cur] = slice;
 
 	if (l.audio->channels == 1) {  // equal-power pan, unity at centre
@@ -49,7 +104,7 @@ void Voice::begin(int slice, bool phraseStart, double slotSeconds, const Loop& l
 		panR[cur] = std::min(1.f, 1 + r.pan);
 	}
 	// Every mode but Ring is gated at DURATION x the slot; Ring plays until the next slice or the note ends.
-	slotLeft = r.tail != TailMode::Ring ? slotSeconds * std::clamp(vp.duration, 0.05f, 1.f) : -1;
+	slotLeft = r.tail != TailMode::Ring ? gate : -1;
 	lastSlice = slice;
 	released = false;
 	loop = &l;
@@ -67,7 +122,7 @@ VoiceOut Voice::play(const SeqEvent& e, double beatPeriod, const Loop& l, const 
 	loop = &l;
 
 	if (e.slice >= 0) {
-		begin(e.slice, e.phraseStart, e.sliceBeats * beatPeriod, l, vp, engineRate);
+		begin(e, e.sliceBeats * beatPeriod, l, vp, engineRate);
 		out.trig = true;
 	}
 	if (e.release && !released) {
@@ -83,16 +138,35 @@ VoiceOut Voice::play(const SeqEvent& e, double beatPeriod, const Loop& l, const 
 
 	const float dt = 1.f / engineRate;
 	const float fe = fenv.process(vp.filterEnv, dt);
+	if (quiet >= kQuietAfter && !players[0].active() && !players[1].active()) {
+		// Nothing has sounded for a while and the filter has rung out: only the envelope outputs move.
+		amp[0].process(vp.ampEnv, dt);
+		amp[1].process(vp.ampEnv, dt);
+		out.ampEnv = amp[cur].value();
+		out.filterEnv = fe;
+		out.slice = lastSlice;
+		controlCountdown = targetCountdown = 0;  // refresh everything on the next sound
+		return out;
+	}
 	if (--targetCountdown <= 0) {
 		updateTargets(l, vp);
 		targetCountdown = kTargetEvery;
 	}
 	if (--controlCountdown <= 0) {
-		const float c = Smoother::coef(kGlide, kControlEvery * dt);
+		if (engineRate != glideRate) { glideRate = engineRate; glideCoef = Smoother::coef(kGlide, kControlEvery * dt); }
+		const float c = glideCoef;
 		gain[0].step(c);
 		gain[1].step(c);
-		if (players[cur].active()) players[cur].setRate(rateBase * semitonesToRatio(pitch.step(c)));
-		filter.set(vp.filter, cutoff.step(c) + vp.filterEnvAmount * fe, res.step(c), engineRate);
+		const float st = pitch.step(c);
+		if (players[cur].active() && st != lastPitch) {
+			lastPitch = st;
+			players[cur].setRate(rateBase * semitonesToRatio(st));
+		}
+		const float fc = cutoff.step(c) + vp.filterEnvAmount * fe, fr = res.step(c);
+		if (vp.filter != filterSet.type || fc != filterSet.cutoff || fr != filterSet.res || engineRate != filterSet.rate) {
+			filterSet = {vp.filter, fc, fr, engineRate};
+			filter.set(vp.filter, fc, fr, engineRate);
+		}
 		controlCountdown = kControlEvery;
 	}
 
@@ -112,17 +186,18 @@ VoiceOut Voice::play(const SeqEvent& e, double beatPeriod, const Loop& l, const 
 	out.right = filter.process(1, r0);
 	out.slice = lastSlice;
 	out.playing = players[0].active() || players[1].active();
+	quiet = !out.playing && std::fabs(out.left) + std::fabs(out.right) < 1e-6f ? quiet + 1 : 0;
 	return out;
 }
 
 void Voice::updateTargets(const Loop& l, const VoiceParams& vp) {
 	for (int k = 0; k < 2; k++)
 		if (sliceOf[k] >= 0 && size_t(sliceOf[k]) < l.slices.size())
-			gain[k].target = dbToGain(resolve(vp, l.slices[size_t(sliceOf[k])].p).gain);
+			gain[k].target = dbToGain(resolve(vp, l.slices[size_t(sliceOf[k])].p).gain) * velocity[k];
 	const SliceParams none;
 	const SliceParams& sp = lastSlice >= 0 && size_t(lastSlice) < l.slices.size() ? l.slices[size_t(lastSlice)].p : none;
 	const Resolved r = resolve(vp, sp);
-	pitch.target = r.pitch;
+	pitch.target = std::clamp(r.pitch + eventPitch, -48.f, 48.f);
 	cutoff.target = r.cutoff;
 	res.target = r.res;
 }

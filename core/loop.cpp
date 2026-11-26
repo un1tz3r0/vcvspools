@@ -121,6 +121,7 @@ std::shared_ptr<Loop> loadLoop(const uint8_t* data, size_t size, const std::stri
 	double bpm = meta.hasAcid && meta.bpm > 0 ? meta.bpm : 0;
 	if (bpm <= 0 && meta.hasAcid && meta.beats > 0) bpm = meta.beats * 60.0 / audio->seconds();
 	auto loop = makeLoop(audio, {0, audio->frames}, bpm, bpm > 0, starts, Origin::Acid, path);
+	loop->spls = meta.spls;
 	if (meta.hasAcid) { loop->meterNum = meta.meterNum ? meta.meterNum : 4; loop->meterDen = meta.meterDen ? meta.meterDen : 4; }
 	if (meta.hasLoop && meta.loopEnd > meta.loopStart) {
 		auto first = [&](size_t frame) {  // index of the slice containing `frame`

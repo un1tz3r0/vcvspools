@@ -114,3 +114,96 @@ TEST_CASE("eco quality is usable") {
 	for (size_t i = 100; i < out.size(); i++) maxErr = std::max(maxErr, std::fabs(out[i] - std::sin(2 * M_PI * 1000 * (100 + i * 0.7071) / 48000)));
 	CHECK(maxErr < 2e-2);
 }
+
+TEST_CASE("loops: a forward loop with crossfade plays seamlessly past the span end") {
+	auto a = std::make_shared<Audio>();
+	a->sampleRate = 48000;
+	a->channels = 1;
+	a->frames = 4800;
+	for (size_t i = 0; i < a->frames; i++) a->data[0].push_back(0.5f * float(std::sin(2 * M_PI * i / 48.0)));  // 1 kHz
+	SlicePlayer p;
+	p.start(a.get(), {0, 4800, false}, 1.0, 48000);
+	p.setLoop({1200, 2400 + 7, false, 96});  // a loop length that is NOT a whole number of periods
+	REQUIRE(p.looping());
+	float l, r, prev = 0, maxStep = 0;
+	for (int i = 0; i < 48000; i++) {
+		REQUIRE(p.process(l, r));
+		if (i > 100) maxStep = std::max(maxStep, std::fabs(l - prev));
+		prev = l;
+	}
+	CHECK(maxStep < 0.5f * 2 * float(M_PI) / 48 * 1.6f);  // never steeper than the sine (plus crossfade wobble)
+	CHECK(p.position() >= 1200);
+	CHECK(p.position() < 2407);
+	p.stop(0.005f);
+	int n = 0;
+	while (p.process(l, r)) n++;
+	CHECK(n == doctest::Approx(240).epsilon(0.02));
+}
+
+TEST_CASE("loops: ping-pong turns at both ends; reversed spans ignore loops") {
+	auto a = std::make_shared<Audio>();
+	a->sampleRate = 48000;
+	a->channels = 1;
+	a->frames = 1000;
+	for (size_t i = 0; i < a->frames; i++) a->data[0].push_back(float(i) / 1000.f);  // ramp
+	SlicePlayer p;
+	p.start(a.get(), {0, 1000, false}, 1.0, 48000);
+	p.setLoop({400, 600, true, 0});
+	float l, r;
+	double lo = 1e9, hi = 0;
+	for (int i = 0; i < 2000; i++) {
+		p.process(l, r);
+		if (i > 700) { lo = std::min(lo, p.position()); hi = std::max(hi, p.position()); }
+	}
+	CHECK(lo == doctest::Approx(400).epsilon(0.01));
+	CHECK(hi == doctest::Approx(600).epsilon(0.01));
+
+	SlicePlayer q;
+	q.start(a.get(), {0, 1000, true}, 1.0, 48000);
+	q.setLoop({400, 600, false, 0});
+	CHECK_FALSE(q.looping());
+}
+
+TEST_CASE("stretch: grains fill the requested time at the original pitch, without dips or clicks") {
+	const double hz = 200, sr = 48000, period = sr / hz;
+	Audio a = sine(hz, sr, 24000);
+	for (double factor : {0.5, 2.0, 3.0}) {
+		SlicePlayer p;
+		p.start(&a, SlicePlayer::span(a, 0, 24000, 0, 0, false), 1.0, 48000);
+		SlicePlayer::StretchPlan plan;
+		plan.from = 4800;
+		plan.to = 24000;
+		plan.outSamples = 19200 * factor;
+		plan.grain = 3 * period;
+		plan.period = period;
+		REQUIRE(p.setStretch(plan));
+		auto out = run(p);
+		CHECK(double(out.size()) == doctest::Approx(4800 + plan.outSamples).epsilon(0.03));
+		float maxStep = 0, lo = 1, hi = 0;
+		for (size_t i = 100; i + 200 < out.size(); i++) maxStep = std::max(maxStep, std::fabs(out[i + 1] - out[i]));
+		for (size_t c = 4800; c + 2 * size_t(period) < out.size() - 200; c += size_t(period)) {  // per-cycle peak
+			float pk = 0;
+			for (size_t i = c; i < c + size_t(period); i++) pk = std::max(pk, std::fabs(out[i]));
+			lo = std::min(lo, pk);
+			hi = std::max(hi, pk);
+		}
+		CHECK(maxStep < 0.04f);  // a full-scale 200 Hz sine moves 0.026 per sample
+		CHECK(lo > 0.9f);
+		CHECK(hi < 1.1f);
+		// Zero crossings stay one period apart: the pitch is kept.
+		std::vector<size_t> zc;
+		for (size_t i = 5000; i + 300 < out.size(); i++) if (out[i - 1] < 0 && out[i] >= 0) zc.push_back(i);
+		REQUIRE(zc.size() > 4);
+		CHECK(double(zc.back() - zc.front()) / double(zc.size() - 1) == doctest::Approx(period).epsilon(0.01));
+	}
+}
+
+TEST_CASE("stretch is refused for short regions, short times and reversed spans") {
+	Audio a = sine(200, 48000, 24000);
+	SlicePlayer p;
+	p.start(&a, SlicePlayer::span(a, 0, 24000, 0, 0, false), 1.0, 48000);
+	CHECK_FALSE(p.setStretch({23000, 24000, 48000, 960, 0, 1}));
+	CHECK_FALSE(p.setStretch({0, 24000, 500, 960, 0, 1}));
+	p.start(&a, SlicePlayer::span(a, 0, 24000, 0, 0, true), 1.0, 48000);
+	CHECK_FALSE(p.setStretch({0, 24000, 48000, 960, 0, 1}));
+}
