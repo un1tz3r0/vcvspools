@@ -35,7 +35,7 @@ Each top-level item is a minor version (`2.N.0`) and one PR to `main`. Each seco
 
 - [ ] **2.6 Panel and display**
   - [x] 2.6.1 Final 36 HP panel SVG and control layout
-  - [ ] 2.6.2 Page framework: tab row, `Page`/`DisplayContext`, Loop and Settings pages
+  - [x] 2.6.2 Page framework: tab row, `Page`/`DisplayContext`, Loop and Settings pages
   - [ ] 2.6.3 Loop page drawing: OKLCH slice hues, grid, region, playheads, readouts, REX badge, light layer
   - [ ] 2.6.4 Mouse editing: select/deselect/multi-select, drag boundaries and trims, add/delete slices, region handles, zoom/scroll, undo history
   - [ ] 2.6.5 Selection editing: knob retargeting to the selection mean, relative multi-edit, shift-click = set to mean, spread ring

@@ -2,6 +2,13 @@
 
 Versions follow `TODO.md`: each `2.N.p` heading is one task, and the last one in a milestone is the released version.
 
+## 2.6.2
+
+- Display page framework: a tab row (13 px) picks a `Page`; pages share a `DisplayContext` (module, loop, drawing helpers, page area) and get clicks, drags and scrolls in page coordinates. The chosen page is saved with the patch.
+- LOOP page: the existing waveform view, moved into its own file.
+- SETTINGS page: all 14 global options in three columns; clicking a row opens its choices.
+- One settings table (`src/Settings.cpp`) feeds both the page and the context menu, which now groups the options as Playback, Slicing, Transport and Engine.
+
 ## 2.6.1
 
 - Final 36 HP layout: taller display (136 px, room for the page tabs), a shaded tone strip with filter and envelope controls, the main knob row with a CV amount and jack under each, and boxed input and output rows. Checked against a 100 %-scale render in light and dark: all labels are 12 px Nunito Bold, no overlaps.

@@ -1,6 +1,7 @@
 #include <osdialog.h>
 #include "Spools.hpp"
 #include "Display.hpp"
+#include "Settings.hpp"
 
 namespace {
 
@@ -110,57 +111,8 @@ void tempoMenu(Menu* menu, Spools* m) {
 	menu->addChild(tap);
 }
 
-// Controls that live on the display's Settings page once it exists (DESIGN §7).
-void playbackMenu(Menu* menu, Spools* m) {
-	auto paramChoice = [=](const char* name, int id, std::vector<std::string> labels) {
-		menu->addChild(createIndexSubmenuItem(name, labels,
-			[=] { return size_t(m->params[id].getValue()); }, [=](size_t i) { m->params[id].setValue(float(i)); }));
-	};
-	paramChoice("Direction", Spools::DIRECTION_PARAM, {"Forward", "Reverse", "Ping-pong", "Random"});
-	paramChoice("Tail", Spools::TAIL_PARAM, {"Ring", "Cut"});
-	std::vector<std::string> loops = {"∞"};
-	for (int i = 1; i <= 16; i++) loops.push_back(std::to_string(i));
-	paramChoice("Loop count", Spools::LOOP_COUNT_PARAM, loops);
-}
 
-void transportMenu(Menu* menu, Spools* m) {
-	std::vector<std::string> bars = {"From loop"};
-	std::vector<float> beats = {0};
-	for (int b : {2, 3, 4, 5, 6, 7, 8, 12, 16}) { bars.push_back(string::f("%d beats", b)); beats.push_back(float(b)); }
-	menu->addChild(createIndexSubmenuItem("Bar length", bars,
-		[=] { return size_t(std::find(beats.begin(), beats.end(), m->barBeats.load()) - beats.begin()) % beats.size(); },
-		[=](size_t i) { m->barBeats = beats[i]; }));
-	std::vector<std::string> cycles = {"∞ (CONT input only)"};
-	std::vector<int> counts = {0};
-	for (int n : {1, 2, 4, 8, 16, 32, 64}) { cycles.push_back(string::f("%d bar%s", n, n == 1 ? "" : "s")); counts.push_back(n); }
-	menu->addChild(createIndexSubmenuItem("Bars per cycle", cycles,
-		[=] { return size_t(std::find(counts.begin(), counts.end(), m->barsPerCycle.load()) - counts.begin()) % counts.size(); },
-		[=](size_t i) { m->barsPerCycle = counts[i]; }));
-}
 
-// Each change re-slices right away, so the menu doubles as a preview.
-void slicingMenu(Menu* menu, Spools* m) {
-	auto choice = [=](const char* name, std::vector<std::string> labels, std::vector<double> values, auto get, auto set) {
-		menu->addChild(createIndexSubmenuItem(name, labels,
-			[=] {
-				double v = get();
-				size_t best = 0;
-				for (size_t i = 1; i < values.size(); i++)
-					if (std::fabs(values[i] - v) < std::fabs(values[best] - v)) best = i;
-				return best;
-			},
-			[=](size_t i) { set(values[i]); m->reslice(); }));
-	};
-	choice("Mode", {"Onsets", "Grid", "Hybrid (grid + strong hits)"}, {0, 1, 2},
-		[=] { return double(m->slicing.mode); }, [=](double v) { m->slicing.mode = spools::SliceMode(int(v)); });
-	choice("Grid", {"1/4", "1/8", "1/16", "1/32", "1/8 triplet", "1/16 triplet"}, {1, 0.5, 0.25, 0.125, 1.0 / 3, 1.0 / 6},
-		[=] { return m->slicing.gridBeats; }, [=](double v) { m->slicing.gridBeats = v; });
-	std::vector<std::string> pct = {"0%", "25%", "50%", "75%", "100%"};
-	std::vector<double> frac = {0, 0.25, 0.5, 0.75, 1};
-	choice("Sensitivity", pct, frac, [=] { return double(m->slicing.sensitivity); }, [=](double v) { m->slicing.sensitivity = float(v); });
-	choice("Grid snap", pct, frac, [=] { return double(m->slicing.snap); }, [=](double v) { m->slicing.snap = float(v); });
-	menu->addChild(createMenuItem("Re-slice now", "", [=] { m->reslice(); }));
-}
 
 }
 
@@ -257,21 +209,8 @@ struct SpoolsWidget : ModuleWidget {
 		}));
 		menu->addChild(createSubmenuItem("Crop", "", [=](Menu* sub) { cropMenu(sub, m); }));
 		menu->addChild(createSubmenuItem("Loop tempo", "", [=](Menu* sub) { tempoMenu(sub, m); }));
-		menu->addChild(createSubmenuItem("Auto-slice", "", [=](Menu* sub) { slicingMenu(sub, m); }));
-		static const std::vector<int> ppqns = {1, 2, 4, 8, 24, 48, 96};
-		std::vector<std::string> labels;
-		for (int p : ppqns) labels.push_back(string::f("%d PPQN", p));
-		menu->addChild(createIndexSubmenuItem("Clock resolution", labels,
-			[=] { return size_t(std::find(ppqns.begin(), ppqns.end(), m->ppqn.load()) - ppqns.begin()); },
-			[=](size_t i) { m->ppqn = ppqns[i]; }));
-		menu->addChild(createIndexSubmenuItem("Mode", {"Note (V/oct + gate)", "Loop (transport)"},
-			[=] { return size_t(m->playMode.load()); }, [=](size_t i) { m->playMode = int(i); }));
-		menu->addChild(createSubmenuItem("Playback", "", [=](Menu* sub) { playbackMenu(sub, m); }));
-		menu->addChild(createSubmenuItem("Transport", "", [=](Menu* sub) { transportMenu(sub, m); }));
-		menu->addChild(createIndexSubmenuItem("Envelope retrigger", {"Each slice", "Each note"},
-			[=] { return size_t(m->retriggerPerNote.load()); }, [=](size_t i) { m->retriggerPerNote = i == 1; }));
-		menu->addChild(createBoolMenuItem("Eco interpolation (8 taps)", "", [=] { return m->eco.load(); }, [=](bool b) { m->eco = b; }));
-		menu->addChild(createBoolMenuItem("Embed audio in patch", "", [=] { return m->embedAudio.load(); }, [=](bool b) { m->embedAudio = b; }));
+		menu->addChild(new MenuSeparator);
+		appendSettingsMenus(menu, m);
 	}
 };
 

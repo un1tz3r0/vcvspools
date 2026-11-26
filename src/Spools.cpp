@@ -348,6 +348,7 @@ json_t* Spools::dataToJson() {
 	json_object_set_new(root, "barBeats", json_real(barBeats));
 	json_object_set_new(root, "barsPerCycle", json_integer(barsPerCycle));
 	json_object_set_new(root, "mode", json_integer(playMode));
+	json_object_set_new(root, "displayPage", json_integer(displayPage));
 	json_t* js = json_object();
 	json_object_set_new(js, "mode", json_integer(int(slicing.mode)));
 	json_object_set_new(js, "gridBeats", json_real(slicing.gridBeats));
@@ -384,6 +385,7 @@ void Spools::dataFromJson(json_t* root) {
 	if (json_t* x = json_object_get(root, "embedAudio")) embedAudio = json_is_true(x);
 	if (json_t* x = json_object_get(root, "retriggerPerNote")) retriggerPerNote = json_is_true(x);
 	if (json_t* x = json_object_get(root, "barBeats")) barBeats = clamp(float(json_number_value(x)), 0.f, 64.f);
+	if (json_t* x = json_object_get(root, "displayPage")) displayPage = int(json_integer_value(x));
 	if (json_t* x = json_object_get(root, "mode")) playMode = clamp(int(json_integer_value(x)), 0, 1);
 	if (json_t* x = json_object_get(root, "barsPerCycle")) barsPerCycle = clamp(int(json_integer_value(x)), 0, 64);
 	if (json_t* js = json_object_get(root, "slicing")) {

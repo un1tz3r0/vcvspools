@@ -71,7 +71,8 @@ struct Spools : Module {
 	bool wasLoopMode = false;  // audio thread
 	spools::LoopSequencer loopSeqs[kMaxVoices];
 	std::atomic<float> barBeats{0};      // 0 = from the loop's meter
-	std::atomic<int> barsPerCycle{0};    // automatic CONT every N bars; 0 = never
+	std::atomic<int> barsPerCycle{0};
+	int displayPage = 0;  // UI thread    // automatic CONT every N bars; 0 = never
 	spools::SliceSettings slicing;  // UI thread only; workers get a copy
 	spools::CropSpec::Unit cropUnit = spools::CropSpec::Seconds;  // unit shown in the crop fields
 	spools::TapTempo tapTempo;
