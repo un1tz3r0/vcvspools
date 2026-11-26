@@ -2,6 +2,11 @@
 
 Versions follow `TODO.md`: each `2.N.p` heading is one task, and the last one in a milestone is the released version.
 
+## 2.6.3
+
+- LOOP page drawing: slice colours are evenly spaced OKLCH hues at equal lightness, with alternate slices on opposite halves of the circle so neighbours never look alike (`core/color.hpp`). Beat and bar grid at the loop's own tempo. The region gets an amber bracket and the slices outside it are dimmed. Each playhead and its slice marker take that slice's colour.
+- Header: a 16 px BPM readout, the slice count and length, outlined LOOP MODE and REX badges, and the file name clipped to the space that is left.
+
 ## 2.6.2
 
 - Display page framework: a tab row (13 px) picks a `Page`; pages share a `DisplayContext` (module, loop, drawing helpers, page area) and get clicks, drags and scrolls in page coordinates. The chosen page is saved with the patch.
