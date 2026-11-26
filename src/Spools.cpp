@@ -6,6 +6,19 @@
 
 using namespace spools;
 
+// Envelope times: knob 0..1 maps to 0..10 s on a 1 ms-based exponential curve.
+static float envSeconds(float x) { return 0.001f * (std::pow(10001.f, x) - 1.f); }
+
+struct EnvTimeQuantity : ParamQuantity {
+	float getDisplayValue() override { return envSeconds(getValue()); }
+	void setDisplayValue(float s) override { setValue(std::log(std::max(s, 0.f) * 1000.f + 1.f) / std::log(10001.f)); }
+	std::string getDisplayValueString() override {
+		float s = getDisplayValue();
+		return s < 1.f ? string::f("%.1f", s * 1000.f) : string::f("%.2f", s);
+	}
+	std::string getUnit() override { return getDisplayValue() < 1.f ? " ms" : " s"; }
+};
+
 static const double kQuantizeBeats[] = {0, 0.125, 0.25, 0.5, 1, 2, 4};
 static const std::vector<std::string> kQuantizeLabels = {"Off", "1/32", "1/16", "1/8", "1/4", "1/2", "1 bar"};
 
@@ -42,6 +55,20 @@ Spools::Spools() {
 	configParam(RES_PARAM, 0.f, 1.f, 0.f, "Resonance", "%", 0.f, 100.f);
 	configParam(CUTOFF_ATT_PARAM, -1.f, 1.f, 0.f, "Cutoff CV amount", "%", 0.f, 100.f);
 	configParam(RES_ATT_PARAM, -1.f, 1.f, 0.f, "Resonance CV amount", "%", 0.f, 100.f);
+	auto envTime = [&](int id, float seconds, const char* name) {
+		configParam<EnvTimeQuantity>(id, 0.f, 1.f, std::log(seconds * 1000.f + 1.f) / std::log(10001.f), name);
+	};
+	configParam(FILTER_ENV_AMOUNT_PARAM, -5.f, 5.f, 0.f, "Filter envelope amount", " oct");
+	envTime(FILTER_A_PARAM, 0.f, "Filter attack");
+	envTime(FILTER_D_PARAM, 0.3f, "Filter decay");
+	configParam(FILTER_S_PARAM, 0.f, 1.f, 0.f, "Filter sustain", "%", 0.f, 100.f);
+	envTime(FILTER_R_PARAM, 0.1f, "Filter release");
+	envTime(AMP_A_PARAM, 0.f, "Amp attack");
+	envTime(AMP_D_PARAM, 0.5f, "Amp decay");
+	configParam(AMP_S_PARAM, 0.f, 1.f, 1.f, "Amp sustain", "%", 0.f, 100.f);
+	envTime(AMP_R_PARAM, 0.f, "Amp release");
+	configOutput(AMP_ENV_OUTPUT, "Amp envelope (0–10 V)");
+	configOutput(FILTER_ENV_OUTPUT, "Filter envelope (0–10 V)");
 	configInput(CUTOFF_INPUT, "Cutoff CV (1 V/oct at 100%)");
 	configInput(RES_INPUT, "Resonance CV (10 V = 100%)");
 	configInput(PITCH_INPUT, "Pitch CV (1 V/oct)");
@@ -140,6 +167,7 @@ void Spools::onReset(const ResetEvent& e) {
 	ppqn = 1;
 	eco = false;
 	embedAudio = true;
+	retriggerPerNote = false;
 	slicing = {};
 	cropUnit = CropSpec::Seconds;
 }
@@ -155,10 +183,10 @@ void Spools::process(const ProcessArgs& args) {
 	currentBpm = float(timebase.bpm());
 
 	const int channels = std::max({1, inputs[VOCT_INPUT].getChannels(), inputs[GATE_INPUT].getChannels()});
-	for (int id : {LEFT_OUTPUT, RIGHT_OUTPUT, SLICE_OUTPUT, TRIG_OUTPUT, EOC_OUTPUT}) outputs[id].setChannels(channels);
+	for (int id = 0; id < OUTPUTS_LEN; id++) outputs[id].setChannels(channels);
 	activeChannels = channels;
 	if (!l) {
-		for (int id : {LEFT_OUTPUT, RIGHT_OUTPUT, SLICE_OUTPUT, TRIG_OUTPUT, EOC_OUTPUT})
+		for (int id = 0; id < OUTPUTS_LEN; id++)
 			for (int c = 0; c < channels; c++) outputs[id].setVoltage(0.f, c);
 		return;
 	}
@@ -178,6 +206,12 @@ void Spools::process(const ProcessArgs& args) {
 	vp.duration = params[DURATION_PARAM].getValue();
 	vp.quality = eco ? &SincTable::eco() : &SincTable::hq();
 	vp.filter = FilterType(int(params[FILTER_TYPE_PARAM].getValue()));
+	vp.filterEnvAmount = params[FILTER_ENV_AMOUNT_PARAM].getValue();
+	vp.filterEnv = {envSeconds(params[FILTER_A_PARAM].getValue()), envSeconds(params[FILTER_D_PARAM].getValue()),
+		params[FILTER_S_PARAM].getValue(), envSeconds(params[FILTER_R_PARAM].getValue())};
+	vp.ampEnv = {envSeconds(params[AMP_A_PARAM].getValue()), envSeconds(params[AMP_D_PARAM].getValue()),
+		params[AMP_S_PARAM].getValue(), envSeconds(params[AMP_R_PARAM].getValue())};
+	vp.retriggerPerNote = retriggerPerNote;
 
 	const double beat = timebase.phase(), period = timebase.beatPeriod();
 	for (int c = 0; c < channels; c++) {
@@ -211,6 +245,8 @@ void Spools::process(const ProcessArgs& args) {
 		outputs[SLICE_OUTPUT].setVoltage(o.slice >= 0 ? semitonesToVolts(o.slice) : 0.f, c);
 		outputs[TRIG_OUTPUT].setVoltage(trigPulses[c].process(args.sampleTime) ? 10.f : 0.f, c);
 		outputs[EOC_OUTPUT].setVoltage(eocPulses[c].process(args.sampleTime) ? 10.f : 0.f, c);
+		outputs[AMP_ENV_OUTPUT].setVoltage(10.f * o.ampEnv, c);
+		outputs[FILTER_ENV_OUTPUT].setVoltage(10.f * o.filterEnv, c);
 		playingSlice[c] = o.playing ? o.slice : -1;
 		playheads[c] = o.playing ? float(voices[c].player().position()) : -1.f;
 	}
@@ -273,6 +309,7 @@ json_t* Spools::dataToJson() {
 	json_object_set_new(root, "ppqn", json_integer(ppqn));
 	json_object_set_new(root, "eco", json_boolean(eco));
 	json_object_set_new(root, "embedAudio", json_boolean(embedAudio));
+	json_object_set_new(root, "retriggerPerNote", json_boolean(retriggerPerNote));
 	json_t* js = json_object();
 	json_object_set_new(js, "mode", json_integer(int(slicing.mode)));
 	json_object_set_new(js, "gridBeats", json_real(slicing.gridBeats));
@@ -307,6 +344,7 @@ void Spools::dataFromJson(json_t* root) {
 	if (json_t* x = json_object_get(root, "ppqn")) ppqn = clamp(int(json_integer_value(x)), 1, 96);
 	if (json_t* x = json_object_get(root, "eco")) eco = json_is_true(x);
 	if (json_t* x = json_object_get(root, "embedAudio")) embedAudio = json_is_true(x);
+	if (json_t* x = json_object_get(root, "retriggerPerNote")) retriggerPerNote = json_is_true(x);
 	if (json_t* js = json_object_get(root, "slicing")) {
 		slicing.mode = SliceMode(clamp(int(json_integer_value(json_object_get(js, "mode"))), 0, 2));
 		if (json_t* x = json_object_get(js, "gridBeats")) slicing.gridBeats = std::min(std::max(json_number_value(x), 1.0 / 64), 4.0);

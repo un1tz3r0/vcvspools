@@ -2,6 +2,14 @@
 
 Versions follow `TODO.md`: each `2.N.p` heading is one task, and the last one in a milestone is the released version.
 
+## 2.4.2
+
+- Amp and filter ADSR envelopes with exponential segments (0–10 s), a ±5 octave filter envelope amount, and AENV/FENV outputs (0–10 V, polyphonic).
+- Each of a voice's two slice players has its own amp envelope, so a new slice can attack from silence while the previous one keeps its level as it fades out.
+- *Envelope retrigger* menu: each slice (default) or each note. The setting is saved in the patch.
+- A long amp release lets a slice ring past the end of its note. The player stops once the release reaches −60 dB.
+- Bottom row re-spaced to fit the two new outputs (temporary until 2.6.1).
+
 ## 2.4.1
 
 - Per-voice stereo filter: zero-delay-feedback state-variable filter with 12 dB low-pass, band-pass (unity at the peak), high-pass and notch, plus a 24 dB low-pass made of two stages tuned as a 4-pole Butterworth, with resonance on the second stage. Coefficients are updated every 4 samples.

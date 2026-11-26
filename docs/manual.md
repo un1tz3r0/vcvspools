@@ -12,10 +12,10 @@ Spools is an early proof of concept. See `DESIGN.md` for the planned behaviour a
 ## Panel
 
 - **Display**: the loop, coloured by slice, with a playhead per voice. The header shows the file, the current BPM (a `?` means it was guessed), the slice count and the length.
-- **Tone strip** (under the display): FILTER type (off, low-pass 12 dB, band-pass, high-pass 12 dB, notch, low-pass 24 dB), CUTOFF and RES, each with a CV-amount knob and a CV jack. Cutoff CV is 1 V/oct at 100%; resonance CV is 10 V = 100%.
+- **Tone strip** (under the display): FILTER type (off, low-pass 12 dB, band-pass, high-pass 12 dB, notch, low-pass 24 dB), CUTOFF and RES, each with a CV-amount knob and a CV jack. Cutoff CV is 1 V/oct at 100%; resonance CV is 10 V = 100%. F.ENV sets how far the filter envelope moves the cutoff (±5 octaves). Then come the FILTER ENV and AMP ENV attack, decay, sustain and release knobs (0 to 10 s, exponential).
 - **Main row**: SLICE (start slice), LENGTH, trim IN/OUT, PITCH, LEVEL, XFADE (overlap), DUR (gate length in Cut mode), QUANT (launch quantize), BPM. Each knob with a CV jack has a small CV-amount knob above the jack.
 - **RING/CUT** switch and **DIR** (direction) knob.
-- **Bottom**: V/OCT, GATE, CLOCK inputs; region FROM/TO and LOOPS; outputs L, R, SLICE, TRIG, EOC.
+- **Bottom**: V/OCT, GATE, CLOCK inputs; region FROM/TO and LOOPS; outputs L, R, SLICE, TRIG, EOC, AENV, FENV.
 
 ## Playing slices
 
@@ -26,6 +26,7 @@ Spools is an early proof of concept. See `DESIGN.md` for the planned behaviour a
 - **REGION** start/end limit which slices are reachable. Note offsets wrap inside the region.
 - **TAIL**: *Ring* lets each slice play out. *Cut* gates it after **DURATION** × its time slot.
 - **OVERLAP** is how long a slice keeps fading out after the next one starts.
+- **Envelopes** restart on each slice by default, so every hit gets its own attack. Right-click → **Envelope retrigger** → *Each note* runs them once per triggered phrase instead. The amp envelope's release starts when the note ends (gate released, or the Cut time is up). A release shorter than OVERLAP uses the overlap fade instead. The default (no attack, full sustain, no release) leaves the sound unchanged.
 
 ## Crop and tempo
 
@@ -50,6 +51,7 @@ Right-click → **Auto-slice**. Every change re-slices at once, and the setting 
 | L, R | audio, ±5 V, polyphonic |
 | SLICE | index of the playing slice at 1/12 V per slice, so it can feed V/OCT directly |
 | TRIG | 1 ms pulse at each slice start |
+| AENV, FENV | amp and filter envelopes, 0–10 V |
 | EOC | 1 ms pulse at the end of each phrase pass |
 
 ## Saving

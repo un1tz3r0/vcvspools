@@ -33,6 +33,8 @@ struct Spools : Module {
 		START_ATT_PARAM, LENGTH_ATT_PARAM, START_TRIM_ATT_PARAM, END_TRIM_ATT_PARAM, PITCH_ATT_PARAM,
 		VOLUME_ATT_PARAM, OVERLAP_ATT_PARAM, QUANTIZE_ATT_PARAM,
 		FILTER_TYPE_PARAM, CUTOFF_PARAM, RES_PARAM, CUTOFF_ATT_PARAM, RES_ATT_PARAM,
+		FILTER_ENV_AMOUNT_PARAM, FILTER_A_PARAM, FILTER_D_PARAM, FILTER_S_PARAM, FILTER_R_PARAM,
+		AMP_A_PARAM, AMP_D_PARAM, AMP_S_PARAM, AMP_R_PARAM,
 		PARAMS_LEN
 	};
 	enum InputId {
@@ -41,7 +43,7 @@ struct Spools : Module {
 		OVERLAP_INPUT, QUANTIZE_INPUT, CUTOFF_INPUT, RES_INPUT,
 		INPUTS_LEN
 	};
-	enum OutputId { LEFT_OUTPUT, RIGHT_OUTPUT, SLICE_OUTPUT, TRIG_OUTPUT, EOC_OUTPUT, OUTPUTS_LEN };
+	enum OutputId { LEFT_OUTPUT, RIGHT_OUTPUT, SLICE_OUTPUT, TRIG_OUTPUT, EOC_OUTPUT, AMP_ENV_OUTPUT, FILTER_ENV_OUTPUT, OUTPUTS_LEN };
 	enum LightId { LIGHTS_LEN };
 
 	static constexpr int kMaxVoices = 16;
@@ -57,6 +59,7 @@ struct Spools : Module {
 	std::atomic<int> ppqn{1};
 	std::atomic<bool> eco{false};
 	std::atomic<bool> embedAudio{true};
+	std::atomic<bool> retriggerPerNote{false};
 	spools::SliceSettings slicing;  // UI thread only; workers get a copy
 	spools::CropSpec::Unit cropUnit = spools::CropSpec::Seconds;  // unit shown in the crop fields
 	spools::TapTempo tapTempo;

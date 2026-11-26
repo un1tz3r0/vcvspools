@@ -26,7 +26,7 @@ Each top-level item is a minor version (`2.N.0`) and one PR to `main`. Each seco
 
 - [ ] **2.4 Tone shaping and parameter resolution**
   - [x] 2.4.1 TPT SVF (LP/BP/HP/notch 12 dB) + 24 dB LP, V/oct cutoff
-  - [ ] 2.4.2 Amp and filter ADSR, bipolar amount, per-slice/per-note retrigger, AMP/FILT ENV outputs
+  - [x] 2.4.2 Amp and filter ADSR, bipolar amount, per-slice/per-note retrigger, AMP/FILT ENV outputs
   - [ ] 2.4.3 Global + CV×attenuverter + per-slice parameter resolution, smoothing of continuous params
 
 - [ ] **2.5 Loop mode and transport**

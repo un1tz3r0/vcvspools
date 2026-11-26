@@ -191,25 +191,34 @@ struct SpoolsWidget : ModuleWidget {
 		group("FILTER", {knob(S::FILTER_TYPE_PARAM)});
 		group("CUTOFF", {knob(S::CUTOFF_PARAM), trim(S::CUTOFF_ATT_PARAM), jack(S::CUTOFF_INPUT)});
 		group("RES", {knob(S::RES_PARAM), trim(S::RES_ATT_PARAM), jack(S::RES_INPUT)});
+		group("F.ENV", {knob(S::FILTER_ENV_AMOUNT_PARAM)});
+		auto adsr = [&](const char* label, int first) {
+			static const char* letters[] = {"A", "D", "S", "R"};
+			for (int i = 0; i < 4; i++) labels->labels.push_back({x + kStripStep * i, kStripY + 26, letters[i]});
+			group(label, {knob(first), knob(first + 1), knob(first + 2), knob(first + 3)});
+		};
+		adsr("FILTER ENV", S::FILTER_A_PARAM);
+		adsr("AMP ENV", S::AMP_A_PARAM);
 
-		const float inX[] = {40, 92, 144};
+		const float inX[] = {34, 78, 122};
 		const int ins[] = {S::VOCT_INPUT, S::GATE_INPUT, S::CLOCK_INPUT};
 		const char* inLabels[] = {"V/OCT", "GATE", "CLOCK"};
 		for (int i = 0; i < 3; i++) {
 			addInput(createInputCentered<ThemedPJ301MPort>(Vec(inX[i], kBottomY), module, ins[i]));
 			labels->labels.push_back({inX[i], kBottomY - 18, inLabels[i]});
 		}
-		const float regX[] = {203, 250, 297};
+		const float regX[] = {170, 210, 250};
 		const int regs[] = {S::REGION_START_PARAM, S::REGION_END_PARAM, S::LOOP_COUNT_PARAM};
 		const char* regLabels[] = {"FROM", "TO", "LOOPS"};
 		for (int i = 0; i < 3; i++) {
 			addParam(createParamCentered<RoundSmallBlackKnob>(Vec(regX[i], kBottomY), module, regs[i]));
 			labels->labels.push_back({regX[i], kBottomY - 18, regLabels[i]});
 		}
-		const int outs[] = {S::LEFT_OUTPUT, S::RIGHT_OUTPUT, S::SLICE_OUTPUT, S::TRIG_OUTPUT, S::EOC_OUTPUT};
-		const char* outLabels[] = {"L", "R", "SLICE", "TRIG", "EOC"};
-		for (int i = 0; i < 5; i++) {
-			float x = 352 + 38 * i;
+		const int outs[] = {S::LEFT_OUTPUT, S::RIGHT_OUTPUT, S::SLICE_OUTPUT, S::TRIG_OUTPUT, S::EOC_OUTPUT,
+			S::AMP_ENV_OUTPUT, S::FILTER_ENV_OUTPUT};
+		const char* outLabels[] = {"L", "R", "SLICE", "TRIG", "EOC", "AENV", "FENV"};
+		for (int i = 0; i < 7; i++) {
+			float x = 292 + 36 * i;
 			addOutput(createOutputCentered<ThemedPJ301MPort>(Vec(x, kBottomY), module, outs[i]));
 			labels->labels.push_back({x, kBottomY - 18, outLabels[i]});
 		}
@@ -233,6 +242,8 @@ struct SpoolsWidget : ModuleWidget {
 		menu->addChild(createIndexSubmenuItem("Clock resolution", labels,
 			[=] { return size_t(std::find(ppqns.begin(), ppqns.end(), m->ppqn.load()) - ppqns.begin()); },
 			[=](size_t i) { m->ppqn = ppqns[i]; }));
+		menu->addChild(createIndexSubmenuItem("Envelope retrigger", {"Each slice", "Each note"},
+			[=] { return size_t(m->retriggerPerNote.load()); }, [=](size_t i) { m->retriggerPerNote = i == 1; }));
 		menu->addChild(createBoolMenuItem("Eco interpolation (8 taps)", "", [=] { return m->eco.load(); }, [=](bool b) { m->eco = b; }));
 		menu->addChild(createBoolMenuItem("Embed audio in patch", "", [=] { return m->embedAudio.load(); }, [=](bool b) { m->embedAudio = b; }));
 	}

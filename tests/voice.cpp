@@ -142,3 +142,50 @@ TEST_CASE("the voice filter follows global and per-slice cutoff") {
 	CHECK(w0 / d0 > 0.02);
 	CHECK(w1 / d1 < w0 / d0 * 0.2);
 }
+
+TEST_CASE("amp envelope shapes each slice, or the whole note when retriggering per note") {
+	auto loop = steps();
+	PhraseParams p;
+	p.length = 2;
+	VoiceParams vp;
+	vp.ampEnv = {0.05f, 0.5f, 1.f, 0.f};
+	Voice v;
+	auto perSlice = render(v, *loop, p, vp, 0.25, 24000);
+	CHECK(perSlice.l[600] < 0.5f * 0.1f);                                 // early in the first attack
+	CHECK(perSlice.l[12600] < 0.5f * 0.2f);                               // second slice attacks again
+	CHECK(perSlice.l[11000] == doctest::Approx(0.1f).epsilon(0.01));
+	vp.retriggerPerNote = true;
+	Voice w;
+	auto perNote = render(w, *loop, p, vp, 0.25, 24000);
+	CHECK(perNote.l[600] == doctest::Approx(perSlice.l[600]));
+	CHECK(perNote.l[12600] == doctest::Approx(0.2f).epsilon(0.01));      // no new attack
+}
+
+TEST_CASE("a long amp release lets the slice ring past the note's end; the filter envelope moves the cutoff") {
+	auto loop = steps();
+	PhraseParams p;
+	p.length = 1;
+	VoiceParams vp;
+	vp.tail = TailMode::Cut;
+	vp.duration = 0.5f;          // gated off at 6000 samples
+	vp.ampEnv.r = 0.05f;
+	Voice v;
+	auto r = render(v, *loop, p, vp, 0.25, 12000);
+	CHECK(r.l[5990] == doctest::Approx(0.1f).epsilon(0.01));
+	CHECK(r.l[6000 + 1200] > 0.002f);  // still releasing 25 ms later (-30 dB)
+	CHECK(r.l[6000 + 1200] < 0.005f);
+	CHECK(r.l[6000 + 2500] == 0.f);    // -60 dB reached, player gone
+
+	Voice f;
+	VoiceParams fp;
+	fp.filterEnvAmount = 5;
+	fp.filterEnv = {0.f, 0.1f, 0.f, 0.1f};
+	float e0 = 0, e1 = 0;
+	for (int i = 0; i < 9600; i++) {
+		VoiceOut o = f.process(i / 48000.0 / 0.25, 0.25, i < 10, i == 0, 0, *loop, p, fp, 48000);
+		if (i == 1) e0 = o.filterEnv;
+		if (i == 9599) e1 = o.filterEnv;
+	}
+	CHECK(e0 == doctest::Approx(1).epsilon(0.01));
+	CHECK(e1 < 0.01f);
+}

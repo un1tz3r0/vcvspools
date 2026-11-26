@@ -1,4 +1,5 @@
 #pragma once
+#include "envelope.hpp"
 #include "filter.hpp"
 #include "loop.hpp"
 #include "sequencer.hpp"
@@ -19,6 +20,9 @@ struct VoiceParams {
 	FilterType filter = FilterType::Off;
 	float cutoff = 6;                  // V/oct around C4
 	float res = 0;                     // 0..1
+	AdsrTimes ampEnv, filterEnv{0, 0.3f, 0, 0.1f};
+	float filterEnvAmount = 0;         // octaves at full envelope, -5..5
+	bool retriggerPerNote = false;     // envelopes restart on each slice unless set
 	const SincTable* quality = &SincTable::hq();
 };
 
@@ -26,6 +30,7 @@ struct VoiceOut {
 	float left = 0, right = 0;
 	int slice = -1;   // slice now playing (or last played)
 	bool trig = false, eoc = false, playing = false;
+	float ampEnv = 0, filterEnv = 0;
 };
 
 // One note-mode voice: a phrase sequencer driving two slice players so a new slice can start
@@ -46,10 +51,12 @@ private:
 	bool released = false;
 	const Loop* loop = nullptr;
 	VoiceFilter filter;
+	Adsr amp[2], fenv;  // one amp envelope per player, so an outgoing slice keeps its own
 	int filterCountdown = 0;  // coefficients are refreshed every kFilterEvery samples
 	static constexpr int kFilterEvery = 4;
 
-	void begin(int slice, double slotSeconds, const Loop& l, const VoiceParams& vp, float engineRate);
+	void begin(int slice, bool phraseStart, double slotSeconds, const Loop& l, const VoiceParams& vp, float engineRate);
+	void noteOff(const VoiceParams& vp);
 };
 
 }
