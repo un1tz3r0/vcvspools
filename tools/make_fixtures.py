@@ -41,6 +41,16 @@ def chunk(tag, payload):
     return tag + struct.pack("<I", len(payload)) + payload + (b"\0" if len(payload) % 2 else b"")
 
 
+def acid_chunks(bpm, beats, cues, loop):
+    acid = struct.pack("<IHHfIHHf", 0x02, 60, 0x8000, 0.0, beats, 4, 4, bpm)
+    cue = struct.pack("<I", len(cues)) + b"".join(
+        struct.pack("<II4sIII", i + 1, 0, b"data", 0, 0, frame) for i, (frame, _) in enumerate(cues))
+    adtl = b"adtl" + b"".join(chunk(b"labl", struct.pack("<I", i + 1) + label.encode() + b"\0")
+                              for i, (_, label) in enumerate(cues))
+    smpl = struct.pack("<9I", 0, 0, 22676, 60, 0, 0, 0, 1, 0) + struct.pack("<6I", 0, 0, loop[0], loop[1] - 1, 0, 0)
+    return chunk(b"acid", acid) + chunk(b"cue ", cue) + chunk(b"LIST", adtl) + chunk(b"smpl", smpl)
+
+
 def ffmpeg(src, dst, *args):
     subprocess.run(["ffmpeg", "-loglevel", "error", "-y", "-i", str(src), *args, str(dst)], check=True)
 
@@ -54,6 +64,10 @@ def main():
     riff_wav(OUT / "tone_mono_48k.wav", tone(48000)[:1], 48000, "pcm16")
     quad = np.concatenate([x, -x])
     riff_wav(OUT / "tone_quad.wav", quad, SR, "pcm16")
+    # Two beats at 120 BPM: 0.5 s at 44.1 kHz. Cue ids deliberately out of order relative to position.
+    beats = tone(seconds=0.5)
+    riff_wav(OUT / "acid_loop.wav", beats, SR, "pcm16",
+             acid_chunks(120.0, 2, [(11025, "b"), (0, "a"), (16538, "c")], (0, 22050)))
     if shutil.which("ffmpeg"):
         src = OUT / "tone_pcm16.wav"
         ffmpeg(src, OUT / "tone.aiff", "-c:a", "pcm_s16be")
