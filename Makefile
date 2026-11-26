@@ -3,7 +3,7 @@ include tests.mk
 else
 RACK_DIR ?= ../Rack-SDK
 
-FLAGS += -Icore -Ivendor
+FLAGS += -I. -Ivendor
 SOURCES += $(wildcard src/*.cpp) $(wildcard core/*.cpp)
 DISTRIBUTABLES += LICENSE $(wildcard res)
 

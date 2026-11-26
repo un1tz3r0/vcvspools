@@ -7,7 +7,7 @@ Status: draft for sign-off. Implementation order lives in `TODO.md`.
 ## 1. Goals and non-goals
 
 **Goals**
-- Import REX (`.rex`, `.rx2`, `.rcy`, unofficial), WAV, AIFF, FLAC, MP3 and Ogg Vorbis. Read slice and tempo metadata from Acidized WAV (`acid`, `smpl`, `cue `, `LIST/adtl`).
+- Import REX2 (`.rx2`, unofficial), WAV, AIFF, FLAC, MP3 and Ogg Vorbis. Read slice and tempo metadata from Acidized WAV (`acid`, `smpl`, `cue `, `LIST/adtl`).
 - Crop any region of the source file, by offset+duration in beats (at a BPM), seconds or samples.
 - Detect tempo, or take a manual BPM. Slice on onsets, on a beat grid, or both, with adjustable onset sensitivity and grid-snap strength.
 - Trigger slices from poly V/oct + gate. C4 (0 V) plays the start slice and each semitone is a slice offset. Each trigger plays `length` slices, timed to the incoming clock.
@@ -29,8 +29,7 @@ Two layers:
 
 ```
 core/   Rack-independent C++17 library: decoding, analysis, slicing, DSP, sequencing.
-        Unit-tested on the host with doctest. Depends only on vendored single-header libs
-        and pffft (vendored copy matching the one in Rack's SDK).
+        Unit-tested on the host with doctest. Depends only on vendored single-header libs.
 src/    Rack module, widgets, panel, JSON persistence. Thin glue over core/.
 ```
 
@@ -82,7 +81,7 @@ Slice beat positions come from the grid (or from REX/Acid metadata). Every timin
 | FLAC | `dr_flac` |
 | MP3 | `dr_mp3` |
 | Ogg Vorbis | `stb_vorbis` |
-| REX/RX2/RCY | `core/rex/`: vendored MIT decoder from [schwung-rex](https://github.com/charlesvestal/schwung-rex) behind a `RexReader` interface. If its coverage falls short, we write our own decoder using the other public references. Labelled *unofficial* in the UI and docs. |
+| REX2 (`.rx2`) | `core/rex.cpp`: our own C++ port of the reverse-engineered IFF + DWOP description in [schwung-rex](https://github.com/charlesvestal/schwung-rex) (MIT), with full 24-bit precision. Labelled *unofficial* in the UI and docs. REX1 `.rex`/`.rcy` use a different, undocumented layout and are not supported yet. |
 
 - **REX import** keeps the decoded audio, the slice positions, the tempo, the bar/beat signature and the loop length. Slice beat positions come from the REX PPQ positions. Ignored: REX envelope settings, transient-stretch settings, and anything else the decoder can't recover.
 - **Acidized WAV import** reads the `acid` chunk (tempo, beats, root note, one-shot flag), `cue ` points with `LIST/adtl/labl` as slices, and `smpl` loops as the loop region. Without `acid`, beats are derived from analysis.
@@ -93,9 +92,9 @@ Slice beat positions come from the grid (or from REX/Acid metadata). Every timin
 
 Runs on the worker after import or crop, and again when the sensitivity, grid or BPM settings change. Analysis is cached per crop, so re-slicing reuses the onset envelope.
 
-1. **Onset envelope**: mono mix, STFT (1024/256, Hann, pffft), log-magnitude spectral flux, half-wave rectified, then high-pass filtered.
+1. **Onset envelope**: mono mix, STFT (1024/256, Hann, in-house radix-2 FFT), log-magnitude spectral flux, half-wave rectified, then high-pass filtered.
 2. **Onset picking**: adaptive threshold = median over ±N frames + `δ`. `δ` is driven by the *Onset sensitivity* control. A minimum inter-onset gap applies. Each onset is refined to a local energy rise, then to the nearest preceding zero crossing.
-3. **Tempo**: autocorrelation of the onset envelope, weighted by a log-normal prior centred on 120 BPM over 60–200, then a comb-filter bank to pick the octave. If crop duration × BPM is close to a whole number of bars, BPM is nudged to exactly fit (so loops loop). Manual BPM overrides this. *Halve*, *double* and *tap* are menu actions.
+3. **Tempo**: autocorrelation of the onset envelope, weighted by a log-normal prior centred on 120 BPM over 60–200, then a comb-filter bank to pick the octave. If crop duration × BPM is within 1.5 % of a whole number of bars, BPM is nudged to exactly fit (so loops loop). Manual BPM overrides this. *Halve*, *double* and *tap* are menu actions.
 4. **Beat grid**: phase found by cross-correlating an impulse train with the onset envelope, or set to crop start when the crop is bar-aligned (the default).
 5. **Slicing modes**: *Onsets*, *Grid* (1/4, 1/8, 1/16, 1/32, triplets), *Hybrid* (grid points plus strong onsets). *Grid snap strength* (0–100%) moves each onset toward its nearest grid line: `pos = lerp(onset, grid, s)`. Each slice's `beat` is its (snapped) position in beats.
 6. **Per-slice features** for tail modes:
@@ -115,7 +114,7 @@ Runs on the worker after import or crop, and again when the sensitivity, grid or
 
 - **Region**: `[loopStart, loopEnd]` in slice indices. Start-slice, offsets and phrases all wrap inside it.
 - **Trigger**: on a gate rising edge per poly channel, `offset = round(12 · V/oct)` and `first = wrap(startSlice + offset)`. Negative offsets play earlier slices. Rising edges are delayed to the next *launch quantize* division (off, 1/32 … 1 bar) when that is enabled.
-- **Phrase**: slices `first … first+length-1` (wrapping), in *direction* order. Slice *k* starts `Σ beatLen` beats after the trigger, where `beatLen = slice[k+1].beat - slice[k].beat`. A plain trigger plays the phrase once. A gate that is still high at the end of the phrase repeats it, up to *loop count* times (∞ allowed). When the gate falls, the current slice finishes and the voice releases.
+- **Phrase**: slices `first … first+length-1` (wrapping), in *direction* order. Slice *k* starts `Σ beatLen` beats after the trigger, where `beatLen = slice[k+1].beat - slice[k].beat`. A gate that falls before the first slice ends counts as a trigger and plays the phrase once. A gate still high at the first slice boundary is a held gate: it repeats the phrase at its end, up to *loop count* times (∞ allowed). When the gate falls, the current slice finishes and the voice releases.
 - **Retrigger** on the same channel cuts the old phrase with the crossfade.
 - **Poly**: up to 16 channels, following the V/oct/GATE channel count. Each channel is an independent voice.
 
@@ -128,7 +127,7 @@ Runs on the worker after import or crop, and again when the sensitivity, grid or
 
 ### 6.4 Direction and reverse
 
-Phrase/sequence direction: *forward*, *reverse*, *ping-pong*, *random*. Per-slice `reverse` plays the slice's audio backwards from its end trim, independent of the sequence direction.
+Phrase/sequence direction: *forward*, *reverse*, *ping-pong* (alternate passes forward and backward), *random* (a random slice of the phrase each step). Per-slice `reverse` plays the slice's audio backwards from its end trim, independent of the sequence direction.
 
 ### 6.5 Slice voice and tail modes
 
@@ -149,9 +148,9 @@ The slot is `beatLen · beatPeriod · duration`, where *duration* is a fraction 
 
 ### 6.6 Per-voice DSP chain
 
-`SlicePlayer ×2 → equal-power crossfade → gain/pan → filter → amp VCA → L/R`
+`SlicePlayer ×2 (overlapping) → gain/pan → filter → amp VCA → L/R`
 
-- **Crossfade**: the *overlap* control (0–50 ms) sets how long the outgoing slice continues under the incoming one. Every slice start and stop also gets a 1 ms declick ramp.
+- **Crossfade**: the *overlap* control (0–50 ms, plus the per-slice xfade offset) sets how long the outgoing slice fades out, with a raised-cosine curve, under the incoming one. The incoming slice keeps its attack: it only gets the 1 ms declick, so transients stay sharp.
 - **Filter**: TPT/ZDF state-variable filter, 12 dB LP/BP/HP/Notch, plus a 24 dB LP (two cascaded SVFs with resonance compensation). Cutoff is in V/oct around 261.6 Hz (C4), with 10 octaves of range. Coefficients are updated every 4 samples.
 - **Envelopes**: amp ADSR and filter ADSR with a bipolar amount (±5 octaves), exponential segments. *Retrigger* is per slice (default) or per note.
 
@@ -214,7 +213,7 @@ By default the cropped audio is also written to the module's patch storage direc
 
 - `tests/`: doctest, one file per core area (decoders, rex, acid chunks, analysis, slicing, sequencer timing, tail modes, filter, envelopes, export round-trip). `make test` builds and runs them with the host compiler and no Rack SDK.
 - Fixtures: `tools/make_fixtures.py` (numpy + stdlib `wave`) generates small synthetic loops: click trains at known BPM, sine+noise drums, chords for pitch/loop tests, and Acidized WAVs. Its output is committed so CI doesn't need Python. REX tests use small `.rx2` files from a permissively licensed source in `tests/fixtures/rex/`, and are skipped when none is present.
-- DSP tests check behaviour: timing to ±1 sample, filter response at test frequencies, loop-point continuity, crossfade sums to unity power, no allocation in `process` (via an allocation-counting hook in test builds).
+- DSP tests check behaviour: timing to ±1 sample, filter response at test frequencies, loop-point continuity, no allocation in `process` (via an allocation-counting hook in test builds).
 - CI: a `test` job (Linux host) runs before the four platform builds.
 - Benchmarks (`make bench`, not in CI): 16 voices, sinc16, stretch mode. Target under 3% of one core at 48 kHz on a modern x86.
 
@@ -233,12 +232,12 @@ By default the cropped audio is also written to the module's patch storage direc
 ## 12. Licensing and dependencies
 
 - Spools: GPL-3.0-or-later (`LICENSE` added in the first code milestone).
-- Vendored: dr_wav/dr_flac/dr_mp3 (public domain/MIT-0), stb_vorbis (public domain/MIT), pffft (BSD-like, from Rack's SDK), doctest (MIT, tests only), schwung-rex decoder (MIT, attribution kept in `core/rex/LICENSE`).
+- Vendored: dr_wav/dr_flac/dr_mp3 (public domain/MIT-0), stb_vorbis (public domain/MIT), pffft (BSD-like, from Rack's SDK), doctest (MIT, tests only), schwung-rex format description and reference decoder (MIT; attribution in `vendor/README.md`).
 - REX support is unofficial and unaffiliated with Reason Studios. Docs say so, and bugs go to this repo.
 
 ## 13. Risks
 
-- **REX decoder coverage**: older `.rex`/`.rcy` and compressed variants may not decode. Mitigation: the `RexReader` interface, a clear error on the display, and the Acid WAV path as a fallback.
+- **REX decoder coverage**: REX1 `.rex`/`.rcy` don't decode, and the decoder has only been checked against an independent encoder, not against ReCycle-made files. Mitigation: the `RexReader` interface, a clear error on the display, and the Acid WAV path as a fallback.
 - **CPU**: 16 voices × 2 players × sinc16 + stretch. Mitigation: an eco interpolation option, voices that skip silence, and benchmarks per milestone.
 - **Knob retargeting** fights Rack's param model (the knob shows the selection value while CV modulates the global value). Mitigation: global values live in module state, and the knobs hold only the "current target" value.
 - **Panel space** at 36 HP (§7).
