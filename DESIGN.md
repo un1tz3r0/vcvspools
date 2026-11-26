@@ -173,7 +173,7 @@ The slot is `beatLen · beatPeriod · duration`, where *duration* is a fraction 
 
 **Knobs**: start slice, length (1–64), start trim, end trim, pitch (±24 st), cutoff, resonance, volume, xfade overlap, duration, launch quantize, grid snap, onset sensitivity, BPM (manual; fully counter-clockwise = auto), loop start, loop end, loop count, amp ADSR, filter ADSR + amount.
 
-**Display toolbar and menu** (to save panel space): mode (note/loop), direction, tail mode, filter type, slicing mode/grid, PPQN, bar length, bars per cycle, retrigger mode, interpolation quality, transient preserve, tail %.
+**On the display** (Settings page and per-page toolbars, to save panel space): mode (note/loop/pattern), direction, tail mode, filter type, slicing mode/grid, PPQN, bar length, bars per cycle, retrigger mode, interpolation quality, transient preserve, tail %.
 
 The exact layout is settled in the panel milestone. If it doesn't fit, envelope knobs become small trimpots before the panel grows past 40 HP.
 
@@ -181,7 +181,12 @@ The exact layout is settled in the panel milestone. If it doesn't fit, envelope 
 
 Drawn with NanoVG in `drawLayer(1)`, so it stays lit when the room lights are dimmed. The background is dark neutral and the content colour is light.
 
-- **Views**: *Slices* (default: the cropped loop with slices) and *Crop* (the whole source file with crop handles).
+- **Pages**: a tab row across the top of the display picks the page.
+  - **Loop**: the default page. It shows the cropped loop with slices, the region and playheads. A *Crop* toggle switches to the whole source file with crop handles.
+  - **Slice**: a zoomed editor for the selected slice. It shows start/end trims, the transient-end marker, loop points (manual or auto), and the tail mode, with per-slice parameters as numeric fields.
+  - **Pattern**: the remap sequencer (§11). It appears only once that milestone lands.
+  - **Settings**: global options that don't fit on the panel (the list in §7).
+- Pages are `Page` subclasses sharing a `DisplayContext` (the current `Loop`, the selection, the voice state and a param-edit API). Adding a page doesn't touch the others.
 - **Drawing**: waveform from min/max mips (a level is chosen per pixel). Slices are filled with hues spread evenly around OKLCH. Beat and bar grid lines, the loop region shaded, one playhead per active voice tinted with its slice's hue, selected slices outlined, BPM/beats/slice count/selection readout, and an *unofficial REX* badge when relevant.
 - **Mouse**:
   - Click a slice to select it, and click it again to deselect.
@@ -214,6 +219,12 @@ By default the cropped audio is also written to the module's patch storage direc
 
 ## 11. Later milestones (designed for, not in the proof of concept)
 
+- **Slice remap sequencer (Pattern mode)**: a second sequencer that plays slices in any order, for jungle/DnB-style re-chopping. It becomes a third mode next to note and loop, and is clocked by the same time base and transport.
+  - A pattern has up to 64 steps. Each step holds: slice index (or rest), length in grid ticks (1/32 … 1 bar) plus a ± nudge, ratchet count (1–8) with a ratchet-rate curve, velocity with a ramp across the ratchets, duration (gate fraction), reverse and pitch offset.
+  - Pattern-level loop start/end and count, plus a direction setting.
+  - V/oct offsets the slice index of every step, as in loop mode.
+  - Editing happens on the Pattern page. Steps are drawn as blocks tinted with their slice's hue. Drag vertically to change the slice, drag an edge to change the length, scroll for ratchets, and Alt-drag for velocity. *Init from loop* (identity order), *shuffle* and *reverse* are menu actions.
+  - Patterns are saved in the patch JSON and in the exported `spls` chunk.
 - Per-slice FX send A/B (poly outputs) and per-slice CV A/B outputs, edited like other per-slice params.
 - Resizable panel: the panel is drawn in NanoVG, the display grows with width, and controls stay in a fixed-width column.
 - Expanders, if the panel runs out of room.
