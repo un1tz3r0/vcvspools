@@ -43,7 +43,7 @@ Each top-level item is a minor version (`2.N.0`) and one PR to `main`. Each seco
 
 - [ ] **2.7 Tail modes**
   - [x] 2.7.1 Per-slice features: transient end, YIN fundamental period with confidence
-  - [ ] 2.7.2 Cut and Ring modes
+  - [x] 2.7.2 Cut and Ring modes
   - [ ] 2.7.3 Manual Loop mode (forward/ping-pong, crossfade) + Slice page with loop-point handles
   - [ ] 2.7.4 Auto-loop point search (period multiples, coherence score, zero-crossing snap)
   - [ ] 2.7.5 Granular stretch/squeeze with transient preserve and tail %

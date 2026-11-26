@@ -28,7 +28,9 @@ std::vector<Setting> moduleSettings(Spools* m) {
 	std::vector<Setting> s;
 	s.push_back({"Playback", "Mode", {"Note", "Loop"}, [=] { return size_t(m->playMode.load()); }, [=](size_t i) { m->playMode = int(i); }});
 	s.push_back(paramChoice("Playback", "Direction", m, Spools::DIRECTION_PARAM, {"Forward", "Reverse", "Ping-pong", "Random"}));
-	s.push_back(paramChoice("Playback", "Tail", m, Spools::TAIL_PARAM, {"Ring", "Cut"}));
+	std::vector<std::string> tails;
+	for (auto& t : tailChoices()) tails.push_back(t.name);
+	s.push_back(paramChoice("Playback", "Tail", m, Spools::TAIL_PARAM, tails));
 	std::vector<std::string> loops = {"∞"};
 	for (int i = 1; i <= 16; i++) loops.push_back(std::to_string(i));
 	s.push_back(paramChoice("Playback", "Loop count", m, Spools::LOOP_COUNT_PARAM, loops));

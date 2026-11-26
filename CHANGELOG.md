@@ -2,6 +2,11 @@
 
 Versions follow `TODO.md`: each `2.N.p` heading is one task, and the last one in a milestone is the released version.
 
+## 2.7.2
+
+- Cut and Ring follow DESIGN §6.5 and have tests for both cases. When the slot is longer than the audio, the slice plays once with no click. When it is shorter, the slice fades at the slot end over the overlap time.
+- Every tail mode except Ring is gated at DURATION × slot, now clamped to 5–100 %. The tail modes come from one table shared by the TAIL switch, the SETTINGS page and the menu, ready for Loop, Auto-loop and Stretch.
+
 ## 2.7.1
 
 - Per-slice features for the tail modes (`core/features.hpp`): the transient end (where the short-term level has fallen below half its peak and flattened) and a YIN fundamental-period estimate of the part after it, with a confidence value. In tests the period is within 0.5 % from 55 Hz to 1 kHz.

@@ -27,6 +27,10 @@ struct SavedLoop {
 json_t* sliceParamsToJson(const spools::SliceParams& p);
 void sliceParamsFromJson(json_t* j, spools::SliceParams& p);
 
+// Tail modes offered for the TAIL setting, in menu order (DESIGN §6.5).
+struct TailChoice { spools::TailMode mode; const char* name; };
+const std::vector<TailChoice>& tailChoices();
+
 struct Spools : Module {
 	enum ParamId {
 		START_PARAM, LENGTH_PARAM, START_TRIM_PARAM, END_TRIM_PARAM, PITCH_PARAM, VOLUME_PARAM,

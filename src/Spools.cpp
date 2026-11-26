@@ -19,6 +19,17 @@ struct EnvTimeQuantity : ParamQuantity {
 	std::string getUnit() override { return getDisplayValue() < 1.f ? " ms" : " s"; }
 };
 
+const std::vector<TailChoice>& tailChoices() {
+	static const std::vector<TailChoice> choices = {{TailMode::Ring, "Ring"}, {TailMode::Cut, "Cut"}};
+	return choices;
+}
+
+static std::vector<std::string> tailNames() {
+	std::vector<std::string> names;
+	for (auto& t : tailChoices()) names.push_back(t.name);
+	return names;
+}
+
 static const double kQuantizeBeats[] = {0, 0.125, 0.25, 0.5, 1, 2, 4};
 static const std::vector<std::string> kQuantizeLabels = {"Off", "1/32", "1/16", "1/8", "1/4", "1/2", "1 bar"};
 
@@ -38,7 +49,7 @@ Spools::Spools() {
 	configParam(REGION_END_PARAM, 0.f, 1.f, 1.f, "Region end", "%", 0.f, 100.f);
 	configParam(LOOP_COUNT_PARAM, 0.f, 16.f, 0.f, "Loop count (0 = forever)")->snapEnabled = true;
 	configSwitch(DIRECTION_PARAM, 0.f, 3.f, 0.f, "Direction", {"Forward", "Reverse", "Ping-pong", "Random"});
-	configSwitch(TAIL_PARAM, 0.f, 1.f, 0.f, "Tail", {"Ring", "Cut"});
+	configSwitch(TAIL_PARAM, 0.f, float(tailChoices().size() - 1), 0.f, "Tail", tailNames());
 	const int attended[] = {START_PARAM, LENGTH_PARAM, START_TRIM_PARAM, END_TRIM_PARAM, PITCH_PARAM, VOLUME_PARAM, OVERLAP_PARAM, QUANTIZE_PARAM};
 	for (int i = 0; i <= QUANTIZE_ATT_PARAM - START_ATT_PARAM; i++)
 		configParam(START_ATT_PARAM + i, -1.f, 1.f, 0.f, paramQuantities[attended[i]]->name + " CV amount", "%", 0.f, 100.f);
@@ -289,7 +300,7 @@ void Spools::process(const ProcessArgs& args) {
 
 	if (paramDivider.process()) {  // knob-only values change slowly; per-voice CV is read every sample below
 		VoiceParams& g = globalParams;
-		g.tail = params[TAIL_PARAM].getValue() > 0.5f ? TailMode::Cut : TailMode::Ring;
+		g.tail = tailChoices()[std::min(size_t(params[TAIL_PARAM].getValue()), tailChoices().size() - 1)].mode;
 		g.duration = params[DURATION_PARAM].getValue();
 		g.quality = eco ? &SincTable::eco() : &SincTable::hq();
 		g.filter = FilterType(int(params[FILTER_TYPE_PARAM].getValue()));

@@ -40,7 +40,11 @@ While slices are selected, IN, OUT, PITCH, LEVEL, XFADE, CUTOFF and RES edit tho
 - **DIRECTION**: forward, reverse, ping-pong (alternating passes) or random.
 - **QUANTIZE** delays triggers to the next 1/32 … 1 bar.
 - **REGION** start/end limit which slices are reachable. Note offsets wrap inside the region.
-- **TAIL**: *Ring* lets each slice play out. *Cut* gates it after **DURATION** × its time slot.
+- **TAIL** decides what happens when a slice's time slot and its audio differ in length:
+  - *Ring*: the slice plays until the next slice starts or the note ends, and then fades over the overlap time.
+  - *Cut*: the slice is gated off after **DURATION** × its slot (5–100%), with the same fade.
+  - In both modes a slice shorter than its slot just ends, followed by silence.
+  - A slice can have its own tail mode, which wins over the global one.
 - **OVERLAP** is how long a slice keeps fading out after the next one starts.
 - **Per-slice settings** add to the knobs: a slice's own pitch, level, pan, trims, cutoff, resonance and crossfade are offsets on top of the knob and CV values. The sums are limited to a usable range (for example ±48 semitones, +12 dB). Pitch, level, cutoff and resonance follow knob and CV changes while a slice plays, with a 5 ms glide. The other settings are read when each slice starts.
 - **Envelopes** restart on each slice by default, so every hit gets its own attack. Set **Retrigger** to *Each note* on the SETTINGS page runs them once per triggered phrase instead. The amp envelope's release starts when the note ends (gate released, or the Cut time is up). A release shorter than OVERLAP uses the overlap fade instead. The default (no attack, full sustain, no release) leaves the sound unchanged.

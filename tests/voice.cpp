@@ -209,3 +209,43 @@ TEST_CASE("volume and pitch changes during a slice glide instead of stepping") {
 	CHECK(at5ms > 0.02f);                                  // still gliding a few ms in
 	CHECK(at5ms < 0.07f);
 }
+
+TEST_CASE("tail modes when the slot and the audio differ in length") {
+	auto loop = steps();
+	PhraseParams p;
+	p.length = 1;
+	// Slot longer than the audio (slow clock): both modes play the slice once, then silence, with no click.
+	for (TailMode t : {TailMode::Cut, TailMode::Ring}) {
+		VoiceParams vp;
+		vp.tail = t;
+		Voice v;
+		auto r = render(v, *loop, p, vp, 0.5, 30000);  // slot 24000, audio 12000
+		CHECK(r.l[11000] == doctest::Approx(0.1f).epsilon(0.01));
+		CHECK(r.l[12100] == 0.f);
+		float maxStep = 0;
+		for (size_t i = 11000; i < 12100; i++) maxStep = std::max(maxStep, std::fabs(r.l[i + 1] - r.l[i]));
+		CHECK(maxStep < 0.01f);
+	}
+	// Slot shorter than the audio (fast clock): both fade at the slot end over the overlap time (DESIGN §6.5).
+	VoiceParams cut, ring;
+	cut.tail = TailMode::Cut;
+	cut.overlap = 0.01f;
+	ring.tail = TailMode::Ring;
+	Voice vc, vr;
+	auto rc = render(vc, *loop, p, cut, 0.125, 14000);  // slot 6000
+	auto rr = render(vr, *loop, p, ring, 0.125, 14000);
+	CHECK(rc.l[5900] == doctest::Approx(0.1f).epsilon(0.01));
+	CHECK(rc.l[6240] > 0.01f);   // halfway through the 10 ms fade
+	CHECK(rc.l[6240] < 0.09f);
+	CHECK(rc.l[6600] == 0.f);
+	CHECK(rr.l[5900] == doctest::Approx(0.1f).epsilon(0.01));
+	CHECK(rr.l[6600] == 0.f);
+
+	// A slice's own tail mode wins over the global one.
+	auto l = std::make_shared<Loop>(*loop);
+	l->slices[0].p.tail = TailMode::Cut;
+	ring.duration = 0.5f;
+	Voice vs;
+	auto rs = render(vs, *l, p, ring, 0.25, 14000);
+	CHECK(rs.l[7000] == 0.f);
+}

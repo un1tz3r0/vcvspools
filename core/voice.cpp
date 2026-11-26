@@ -48,7 +48,8 @@ void Voice::begin(int slice, bool phraseStart, double slotSeconds, const Loop& l
 		panL[cur] = std::min(1.f, 1 - r.pan);
 		panR[cur] = std::min(1.f, 1 + r.pan);
 	}
-	slotLeft = r.tail == TailMode::Cut ? slotSeconds * std::clamp(vp.duration, 0.01f, 1.f) : -1;
+	// Every mode but Ring is gated at DURATION x the slot; Ring plays until the next slice or the note ends.
+	slotLeft = r.tail != TailMode::Ring ? slotSeconds * std::clamp(vp.duration, 0.05f, 1.f) : -1;
 	lastSlice = slice;
 	released = false;
 	loop = &l;
