@@ -23,6 +23,7 @@ public:
 	// Fades out over `seconds` (at least the declick time) and goes idle.
 	void stop(float seconds = kDeclick);
 
+	void kill() { audio = nullptr; }  // immediate, for when the audio itself goes away
 	bool active() const { return audio != nullptr; }
 	double position() const { return pos; }  // source frame
 	double progress() const;                  // 0..1 through the span

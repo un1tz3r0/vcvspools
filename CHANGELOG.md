@@ -2,6 +2,13 @@
 
 Versions follow `TODO.md`: each `2.N.p` heading is one task, and the last one in a milestone is the released version.
 
+## 2.2.4
+
+- `Voice`: a phrase sequencer driving two slice players. The outgoing slice fades out with a raised cosine over the overlap time while the incoming slice keeps its attack.
+- Tail modes so far: Ring (the slice plays out) and Cut (gated at `duration` × its slot).
+- Global and per-slice trims, gain, pan, pitch and reverse are summed (reverse is XORed). Mono uses equal-power pan and stereo uses balance. Pitch changes take effect mid-slice.
+- Reports slice index, trigger and end-of-phrase for the SLICE/TRIG/EOC outputs. Swapping the loop hard-stops players that point at the old audio.
+
 ## 2.2.3
 
 - Note-mode `NoteSequencer`: V/oct semitones offset the start slice and wrap both ways inside the region. Each trigger plays `length` slices, scheduled in beats, so clock tempo changes rescale their start times. Directions are forward, reverse, ping-pong (alternating passes) and random within the phrase.

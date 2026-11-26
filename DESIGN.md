@@ -149,9 +149,9 @@ The slot is `beatLen · beatPeriod · duration`, where *duration* is a fraction 
 
 ### 6.6 Per-voice DSP chain
 
-`SlicePlayer ×2 → equal-power crossfade → gain/pan → filter → amp VCA → L/R`
+`SlicePlayer ×2 (overlapping) → gain/pan → filter → amp VCA → L/R`
 
-- **Crossfade**: the *overlap* control (0–50 ms) sets how long the outgoing slice continues under the incoming one. Every slice start and stop also gets a 1 ms declick ramp.
+- **Crossfade**: the *overlap* control (0–50 ms, plus the per-slice xfade offset) sets how long the outgoing slice fades out, with a raised-cosine curve, under the incoming one. The incoming slice keeps its attack: it only gets the 1 ms declick, so transients stay sharp.
 - **Filter**: TPT/ZDF state-variable filter, 12 dB LP/BP/HP/Notch, plus a 24 dB LP (two cascaded SVFs with resonance compensation). Cutoff is in V/oct around 261.6 Hz (C4), with 10 octaves of range. Coefficients are updated every 4 samples.
 - **Envelopes**: amp ADSR and filter ADSR with a bipolar amount (±5 octaves), exponential segments. *Retrigger* is per slice (default) or per note.
 
@@ -214,7 +214,7 @@ By default the cropped audio is also written to the module's patch storage direc
 
 - `tests/`: doctest, one file per core area (decoders, rex, acid chunks, analysis, slicing, sequencer timing, tail modes, filter, envelopes, export round-trip). `make test` builds and runs them with the host compiler and no Rack SDK.
 - Fixtures: `tools/make_fixtures.py` (numpy + stdlib `wave`) generates small synthetic loops: click trains at known BPM, sine+noise drums, chords for pitch/loop tests, and Acidized WAVs. Its output is committed so CI doesn't need Python. REX tests use small `.rx2` files from a permissively licensed source in `tests/fixtures/rex/`, and are skipped when none is present.
-- DSP tests check behaviour: timing to ±1 sample, filter response at test frequencies, loop-point continuity, crossfade sums to unity power, no allocation in `process` (via an allocation-counting hook in test builds).
+- DSP tests check behaviour: timing to ±1 sample, filter response at test frequencies, loop-point continuity, no allocation in `process` (via an allocation-counting hook in test builds).
 - CI: a `test` job (Linux host) runs before the four platform builds.
 - Benchmarks (`make bench`, not in CI): 16 voices, sinc16, stretch mode. Target under 3% of one core at 48 kHz on a modern x86.
 

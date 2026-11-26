@@ -65,8 +65,9 @@ bool SlicePlayer::process(float& l, float& r) {
 		audio = nullptr;
 		return false;
 	}
-	l = read(0, pos) * gain;
-	r = audio->channels > 1 ? read(1, pos) * gain : l;
+	float g = gain >= 1.f ? 1.f : 0.5f - 0.5f * std::cos(3.14159265f * gain);  // raised-cosine fades
+	l = read(0, pos) * g;
+	r = audio->channels > 1 ? read(1, pos) * g : l;
 	pos += s.reverse ? -rate : rate;
 	return true;
 }
