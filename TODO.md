@@ -54,7 +54,7 @@ Each top-level item is a minor version (`2.N.0`) and one PR to `main`. Each seco
 
 - [ ] **2.9 Slice remap sequencer (Pattern mode)**
   - [x] 2.9.1 Pattern model and step playback: order, length/nudge, duration, reverse, pitch
-  - [ ] 2.9.2 Ratchets with rate curve and velocity ramps; pattern loop/count/direction
+  - [x] 2.9.2 Ratchets with rate curve and velocity ramps; pattern loop/count/direction
   - [ ] 2.9.3 Pattern page editor and menu actions; persistence in JSON and `spls`
 
 - [ ] **2.10 Per-slice sends and CV**

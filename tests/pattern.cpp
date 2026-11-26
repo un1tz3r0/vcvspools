@@ -118,3 +118,46 @@ TEST_CASE("a step's duration and pitch reach the voice") {
 	CHECK(out[7000] == 0.f);  // gated at half of the 12000-sample slot
 	CHECK(v.player().position() > 5000);  // an octave up reads twice as fast
 }
+
+TEST_CASE("ratchets: even or curved hits within the step, with a velocity ramp") {
+	auto l = steps4();
+	Pattern p;
+	PatternStep s{1, 8};  // one beat
+	s.ratchets = 4;
+	s.velocity = 1;
+	s.velocityRamp = -0.75f;
+	p.steps = {s};
+	PatternSequencer q;
+	auto h = drive(q, *l, p, 0.99);
+	REQUIRE(h.size() == 4);
+	for (int j = 0; j < 4; j++) {
+		CHECK(h[size_t(j)].beat == doctest::Approx(0.25 * j));
+		CHECK(h[size_t(j)].e.slice == 1);
+		CHECK(h[size_t(j)].e.sliceBeats == doctest::Approx(0.25));
+		CHECK(h[size_t(j)].e.gain == doctest::Approx(1 - 0.25 * j));
+	}
+	CHECK(h[0].e.phraseStart);
+	CHECK_FALSE(h[1].e.phraseStart);
+
+	p.steps[0].ratchetCurve = 1;  // speeding up: gaps shrink
+	PatternSequencer c;
+	auto hc = drive(c, *l, p, 0.99);
+	REQUIRE(hc.size() == 4);
+	for (int j = 1; j < 3; j++) CHECK(hc[size_t(j + 1)].beat - hc[size_t(j)].beat < hc[size_t(j)].beat - hc[size_t(j - 1)].beat);
+	CHECK(p.steps[0].hitAt(4) == 1.0);
+}
+
+TEST_CASE("velocity scales the voice's level") {
+	auto l = steps4();
+	Voice v;
+	SeqEvent e;
+	e.slice = 0;
+	e.sliceBeats = 1;
+	e.gain = 0.5f;
+	float x = 0;
+	for (int i = 0; i < 3000; i++) {
+		x = v.play(e, 0.25, *l, {}, 48000).left;
+		e = {};
+	}
+	CHECK(x == doctest::Approx(0.05f).epsilon(0.02));
+}

@@ -80,7 +80,8 @@ void Voice::begin(const SeqEvent& e, double slotSeconds, const Loop& l, const Vo
 
 	auto span = SlicePlayer::span(*l.audio, s.start, l.sliceEnd(size_t(slice)), r.startTrim, r.endTrim, r.reverse);
 	pitch.snap(r.pitch);  // a new slice starts at its own pitch; only changes while it plays glide
-	gain[cur].snap(dbToGain(r.gain));
+	velocity[cur] = e.gain;
+	gain[cur].snap(dbToGain(r.gain) * e.gain);
 	if (sliceOf[0] < 0 && sliceOf[1] < 0) { cutoff.snap(r.cutoff); res.snap(r.res); }  // first note: no sweep in
 	rateBase = l.audio->sampleRate / engineRate;
 	players[cur].setQuality(vp.quality);
@@ -192,7 +193,7 @@ VoiceOut Voice::play(const SeqEvent& e, double beatPeriod, const Loop& l, const 
 void Voice::updateTargets(const Loop& l, const VoiceParams& vp) {
 	for (int k = 0; k < 2; k++)
 		if (sliceOf[k] >= 0 && size_t(sliceOf[k]) < l.slices.size())
-			gain[k].target = dbToGain(resolve(vp, l.slices[size_t(sliceOf[k])].p).gain);
+			gain[k].target = dbToGain(resolve(vp, l.slices[size_t(sliceOf[k])].p).gain) * velocity[k];
 	const SliceParams none;
 	const SliceParams& sp = lastSlice >= 0 && size_t(lastSlice) < l.slices.size() ? l.slices[size_t(lastSlice)].p : none;
 	const Resolved r = resolve(vp, sp);

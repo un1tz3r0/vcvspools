@@ -37,6 +37,7 @@ struct SeqEvent {
 	float duration = 1;       // multiplies the gate length
 	float pitch = 0;          // semitones
 	bool reverse = false;     // flips the slice's direction
+	float gain = 1;           // velocity, linear
 };
 
 // Note-mode phrase sequencer for one voice (DESIGN §6.2). All timing is in beats from TimeBase,

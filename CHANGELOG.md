@@ -2,6 +2,12 @@
 
 Versions follow `TODO.md`: each `2.N.p` heading is one task, and the last one in a milestone is the released version.
 
+## 2.9.2
+
+- Ratchets: a pattern step can play its slice 1–8 times within its length. The ratchet curve spaces the hits evenly (0), as a roll that speeds up (> 0) or one that slows down (< 0). Each hit is gated for its own share of the step.
+- Velocity: each step sets a level for its first hit, and a ramp moves later hits up or down from it. The level follows into the voice's gain without breaking the per-slice level glide.
+- A random pass picks a step once per slot, so all its ratchet hits play the same step.
+
 ## 2.9.1
 
 - **Pattern mode** (SETTINGS → Mode → Pattern), the third play mode, runs on the loop-mode transport. A pattern (`core/pattern.hpp`) has steps, each with:

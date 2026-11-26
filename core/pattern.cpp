@@ -12,6 +12,18 @@ void Pattern::range(int& first, int& n) const {
 	n = steps.empty() ? 0 : b - a + 1;
 }
 
+double PatternStep::hitAt(int j) const {
+	const int r = std::clamp(ratchets, 1, 8);
+	// 1 - (1 - u)^p: with p > 1 the gaps shrink towards the end (an accelerating roll), with p < 1 they grow.
+	return 1 - std::pow(1 - double(std::clamp(j, 0, r)) / r, std::exp2(1.5 * std::clamp(ratchetCurve, -1.f, 1.f)));
+}
+
+float PatternStep::hitVelocity(int j) const {
+	const int r = std::clamp(ratchets, 1, 8);
+	const float t = r > 1 ? float(j) / float(r - 1) : 0.f;
+	return std::clamp(velocity + velocityRamp * t, 0.f, 1.f);
+}
+
 Pattern initFromLoop(const Loop& l) {
 	Pattern p;
 	PhraseParams none;
@@ -62,10 +74,25 @@ SeqEvent PatternSequencer::process(double loopBeat, bool running, bool restart, 
 		fire = f;
 		at += st.beats();
 	}
-	if (k < 0 || (ps == pass && k == slot)) return {};
+	if (k < 0) return {};
+	const PatternStep& timing = pat.steps[size_t(order(k))];
+	const bool newSlot = ps != pass || k != slot;
+	if (newSlot) {
+		content = order(k);
+		if (pat.direction == Direction::Random) {
+			rng ^= rng << 13; rng ^= rng >> 17; rng ^= rng << 5;
+			content = first + int(rng % uint32_t(n));
+		}
+	}
+	const PatternStep& st = pat.steps[size_t(content)];
+	// Ratchet hit within the slot.
+	const double x = std::clamp((within - fire) / timing.beats(), 0.0, 1.0);
+	int j = 0;
+	while (j + 1 < std::clamp(st.ratchets, 1, 8) && st.hitAt(j + 1) <= x + 1e-9) j++;
+	if (!newSlot && j == hit) return {};
 
 	SeqEvent e;
-	if (pat.loopCount > 0 && ps >= pat.loopCount) {
+	if (newSlot && pat.loopCount > 0 && ps >= pat.loopCount) {
 		finished = true;
 		active = false;
 		e.endOfPhrase = e.release = true;
@@ -75,21 +102,16 @@ SeqEvent PatternSequencer::process(double loopBeat, bool running, bool restart, 
 	e.phraseStart = pass < 0;
 	pass = ps;
 	slot = k;
+	hit = j;
 	active = true;
 
-	const PatternStep& timing = pat.steps[size_t(order(k))];
-	int content = order(k);
-	if (pat.direction == Direction::Random) {
-		rng ^= rng << 13; rng ^= rng >> 17; rng ^= rng << 5;
-		content = first + int(rng % uint32_t(n));
-	}
-	const PatternStep& st = pat.steps[size_t(content)];
 	if (st.slice < 0) {  // rest: whatever is sounding is let go
 		e.release = true;
 		return e;
 	}
 	e.slice = wrap(st.slice + semis, int(l.slices.size()));
-	e.sliceBeats = timing.beats();
+	e.sliceBeats = timing.beats() * (st.hitAt(j + 1) - st.hitAt(j));
+	e.gain = st.hitVelocity(j);
 	e.duration = st.duration;
 	e.reverse = st.reverse;
 	e.pitch = st.pitch;

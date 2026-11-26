@@ -14,7 +14,14 @@ struct PatternStep {
 	float duration = 1;     // fraction of the step that the slice is gated for
 	bool reverse = false;
 	float pitch = 0;        // semitones
+	int ratchets = 1;       // 1..8 hits spread over the step
+	float ratchetCurve = 0; // -1..1: 0 = even, > 0 = hits speed up, < 0 = they slow down
+	float velocity = 1;     // 0..1, the first hit's level
+	float velocityRamp = 0; // -1..1, added to the velocity by the last hit
 	double beats() const { return ticks * kTickBeats; }
+	// Start of ratchet hit j (0..ratchets) as a fraction of the step, and the level of hit j.
+	double hitAt(int j) const;
+	float hitVelocity(int j) const;
 };
 
 struct Pattern {
@@ -35,13 +42,13 @@ Pattern initFromLoop(const Loop& loop);
 class PatternSequencer {
 public:
 	SeqEvent process(double loopBeat, bool running, bool restart, int semitones, const Loop& loop, const Pattern& pattern);
-	void reset() { active = false; pass = -1; slot = -1; }
+	void reset() { active = false; pass = -1; slot = -1; hit = -1; }
 	void seed(uint32_t s) { rng = s ? s : 1; }
 
 private:
 	bool active = false, finished = false;
 	long pass = -1;
-	int slot = -1;
+	int slot = -1, hit = -1, content = -1;
 	uint32_t rng = 0x9E3779B9u;
 };
 

@@ -72,6 +72,7 @@ private:
 	float glideRate = 0, glideCoef = 0, lastPitch = 0;
 	struct { FilterType type = FilterType::Off; float cutoff = -99, res = -1, rate = 0; } filterSet;
 	float eventPitch = 0;  // the playing pattern step's pitch offset
+	float velocity[2] = {1, 1};  // each player's step velocity
 	int quiet = 0;  // samples of silence with no player active
 	static constexpr int kQuietAfter = 4800;  // the filter's tail at the highest resonance is shorter
 	const Loop* loop = nullptr;
