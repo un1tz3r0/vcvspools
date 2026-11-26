@@ -61,6 +61,8 @@ const std::vector<Field>& fields() {
 				}),
 			num("Send A", &SliceParams::sendA, 0, 1, 0.005f, "%.2f"),
 			num("Send B", &SliceParams::sendB, 0, 1, 0.005f, "%.2f"),
+			num("CV A", &SliceParams::cvA, -10, 10, 0.02f, "%+.2f V"),
+			num("CV B", &SliceParams::cvB, -10, 10, 0.02f, "%+.2f V"),
 		};
 	}();
 	return f;

@@ -82,6 +82,8 @@ void Voice::begin(const SeqEvent& e, double slotSeconds, const Loop& l, const Vo
 	pitch.snap(r.pitch);  // a new slice starts at its own pitch; only changes while it plays glide
 	send[0].snap(s.p.sendA);
 	send[1].snap(s.p.sendB);
+	cv[0] = s.p.cvA;
+	cv[1] = s.p.cvB;
 	velocity[cur] = e.gain;
 	gain[cur].snap(dbToGain(r.gain) * e.gain);
 	if (sliceOf[0] < 0 && sliceOf[1] < 0) { cutoff.snap(r.cutoff); res.snap(r.res); }  // first note: no sweep in
@@ -147,6 +149,8 @@ VoiceOut Voice::play(const SeqEvent& e, double beatPeriod, const Loop& l, const 
 		out.ampEnv = amp[cur].value();
 		out.filterEnv = fe;
 		out.slice = lastSlice;
+		out.cvA = cv[0];
+		out.cvB = cv[1];
 		controlCountdown = targetCountdown = 0;  // refresh everything on the next sound
 		return out;
 	}
@@ -191,6 +195,8 @@ VoiceOut Voice::play(const SeqEvent& e, double beatPeriod, const Loop& l, const 
 	const float mono = 0.5f * (out.left + out.right);
 	out.sendA = mono * send[0].value;
 	out.sendB = mono * send[1].value;
+	out.cvA = cv[0];
+	out.cvB = cv[1];
 	out.slice = lastSlice;
 	out.playing = players[0].active() || players[1].active();
 	quiet = !out.playing && std::fabs(out.left) + std::fabs(out.right) < 1e-6f ? quiet + 1 : 0;
@@ -207,6 +213,7 @@ void Voice::updateTargets(const Loop& l, const VoiceParams& vp) {
 	pitch.target = std::clamp(r.pitch + eventPitch, -48.f, 48.f);
 	send[0].target = std::clamp(sp.sendA, 0.f, 1.f);
 	send[1].target = std::clamp(sp.sendB, 0.f, 1.f);
+	if (lastSlice >= 0) { cv[0] = std::clamp(sp.cvA, -10.f, 10.f); cv[1] = std::clamp(sp.cvB, -10.f, 10.f); }
 	cutoff.target = r.cutoff;
 	res.target = r.res;
 }

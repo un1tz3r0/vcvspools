@@ -241,9 +241,9 @@ struct SpoolsWidget : ModuleWidget {
 			labels->labels.push_back({x, kBottomY - 18, outLabels[i]});
 		}
 		// Per-slice outputs: each slice sets its own level into them on the SLICE page.
-		const int sliceOuts[] = {S::SEND_A_OUTPUT, S::SEND_B_OUTPUT};
-		const char* sliceLabels[] = {"SEND A", "SEND B"};
-		for (int i = 0; i < 2; i++) {
+		const int sliceOuts[] = {S::SEND_A_OUTPUT, S::SEND_B_OUTPUT, S::CV_A_OUTPUT, S::CV_B_OUTPUT};
+		const char* sliceLabels[] = {"SEND A", "SEND B", "CV A", "CV B"};
+		for (int i = 0; i < 4; i++) {
 			const float y = kSliceColY0 + kSliceColStep * float(i);
 			addOutput(createOutputCentered<ThemedPJ301MPort>(Vec(kSliceColX, y), module, sliceOuts[i]));
 			labels->labels.push_back({kSliceColX, y - 18, sliceLabels[i]});

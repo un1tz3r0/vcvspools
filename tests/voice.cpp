@@ -337,6 +337,24 @@ TEST_CASE("Stretch tail fills the slot, keeping the attack's timing and the pitc
 	CHECK(half.outSamples == doctest::Approx(18000));
 }
 
+TEST_CASE("CV outputs step to each slice's own voltage and hold after it ends") {
+	auto l = std::make_shared<Loop>(*steps(2));
+	l->slices[0].p.cvA = 2;
+	l->slices[1].p.cvA = -3;
+	l->slices[1].p.cvB = 7.5f;
+	PhraseParams p;
+	p.length = 2;
+	p.loopCount = 1;
+	Voice v;
+	std::vector<VoiceOut> o;
+	for (size_t i = 0; i < 36000; i++) o.push_back(v.process(i / 48000.0 / 0.25, 0.25, i < 10, i == 0, 0, *l, p, {}, 48000));
+	CHECK(o[100].cvA == 2.f);
+	CHECK(o[11999].cvA == 2.f);
+	CHECK(o[12100].cvA == -3.f);
+	CHECK(o[12100].cvB == 7.5f);
+	CHECK(o[35999].cvA == -3.f);
+}
+
 TEST_CASE("sends carry the voice's mono mix at each slice's own level") {
 	auto l = std::make_shared<Loop>(*steps(2));
 	l->slices[0].p.sendA = 0.5f;

@@ -2,6 +2,11 @@
 
 Versions follow `TODO.md`: each `2.N.p` heading is one task, and the last one in a milestone is the released version.
 
+## 2.10.2
+
+- **CV A** and **CV B** outputs: each voice's playing slice sets a voltage (±10 V, 0 by default) on the SLICE page. It steps when a slice starts, holds after the slice ends, and is saved in the patch and the `spls` chunk.
+- Documentation images show the 40 HP panel.
+
 ## 2.10.1
 
 - **SEND A** and **SEND B** outputs: each voice's mono mix, after its filter and amp envelope, scaled by the playing slice's Send A or Send B level (0 by default), polyphonic. Levels are set on the SLICE page, glide when slices change, and are saved in the patch and the `spls` chunk.
