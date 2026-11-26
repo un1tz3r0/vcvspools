@@ -14,8 +14,8 @@ Spools is an early proof of concept. See `DESIGN.md` for the planned behaviour a
 - **Display**: the loop, coloured by slice, with a playhead per voice. The header shows the file, the current BPM (a `?` means it was guessed), the slice count and the length.
 - **Tone strip** (under the display): FILTER type (off, low-pass 12 dB, band-pass, high-pass 12 dB, notch, low-pass 24 dB), CUTOFF and RES, each with a CV-amount knob and a CV jack. Cutoff CV is 1 V/oct at 100%; resonance CV is 10 V = 100%. F.ENV sets how far the filter envelope moves the cutoff (±5 octaves). Then come the FILTER ENV and AMP ENV attack, decay, sustain and release knobs (0 to 10 s, exponential).
 - **Main row**: SLICE (start slice), LENGTH, trim IN/OUT, PITCH, LEVEL, XFADE (overlap), DUR (gate length in Cut mode), QUANT (launch quantize), BPM. Each knob with a CV jack has a small CV-amount knob above the jack.
-- **RING/CUT** switch and **DIR** (direction) knob.
-- **Bottom**: V/OCT, GATE, CLOCK inputs; region FROM/TO and LOOPS; outputs L, R, SLICE, TRIG, EOC, AENV, FENV.
+- **FROM** and **TO** (region) sit under DUR and BPM.
+- **Bottom**: V/OCT, GATE, CLOCK, RUN, CONT and BAR inputs; outputs L, R, SLICE, TRIG, EOC, AENV, FENV.
 
 ## Playing slices
 
@@ -28,6 +28,12 @@ Spools is an early proof of concept. See `DESIGN.md` for the planned behaviour a
 - **OVERLAP** is how long a slice keeps fading out after the next one starts.
 - **Per-slice settings** add to the knobs: a slice's own pitch, level, pan, trims, cutoff, resonance and crossfade are offsets on top of the knob and CV values. The sums are limited to a usable range (for example ±48 semitones, +12 dB). Pitch, level, cutoff and resonance follow knob and CV changes while a slice plays, with a 5 ms glide. The other settings are read when each slice starts.
 - **Envelopes** restart on each slice by default, so every hit gets its own attack. Right-click → **Envelope retrigger** → *Each note* runs them once per triggered phrase instead. The amp envelope's release starts when the note ends (gate released, or the Cut time is up). A release shorter than OVERLAP uses the overlap fade instead. The default (no attack, full sustain, no release) leaves the sound unchanged.
+
+## Transport
+
+RUN, CONT and BAR drive loop mode (next release). RUN is a gate: high runs the loop, and its rising edge restarts it at the start slice. Unpatched means always running. CONT restarts at the start slice on the next clock pulse (at once with no clock). BAR realigns the bar count without moving the playback position. Right-click → **Transport** sets the **Bar length** (from the loop's meter by default) and **Bars per cycle**, which restarts the loop automatically every N bars (∞ = only on CONT).
+
+Right-click → **Playback** holds **Direction**, **Tail** (Ring/Cut) and **Loop count**. Until the display's Settings page arrives they live there instead of on the panel.
 
 ## Crop and tempo
 

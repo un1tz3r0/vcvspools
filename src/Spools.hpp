@@ -9,6 +9,7 @@
 #include "core/loop.hpp"
 #include "core/slicing.hpp"
 #include "core/timebase.hpp"
+#include "core/transport.hpp"
 #include "core/voice.hpp"
 #include "core/worker.hpp"
 
@@ -40,7 +41,7 @@ struct Spools : Module {
 	enum InputId {
 		VOCT_INPUT, GATE_INPUT, CLOCK_INPUT,
 		START_INPUT, LENGTH_INPUT, START_TRIM_INPUT, END_TRIM_INPUT, PITCH_INPUT, VOLUME_INPUT,
-		OVERLAP_INPUT, QUANTIZE_INPUT, CUTOFF_INPUT, RES_INPUT,
+		OVERLAP_INPUT, QUANTIZE_INPUT, CUTOFF_INPUT, RES_INPUT, RUN_INPUT, CONT_INPUT, BAR_INPUT,
 		INPUTS_LEN
 	};
 	enum OutputId { LEFT_OUTPUT, RIGHT_OUTPUT, SLICE_OUTPUT, TRIG_OUTPUT, EOC_OUTPUT, AMP_ENV_OUTPUT, FILTER_ENV_OUTPUT, OUTPUTS_LEN };
@@ -52,6 +53,9 @@ struct Spools : Module {
 	spools::Exchange<spools::Loop> exchange;
 	spools::TimeBase timebase;
 	spools::Voice voices[kMaxVoices];
+	spools::Transport transport;
+	spools::Transport::Out transportState;
+	dsp::SchmittTrigger runTrigger, contTrigger, barTrigger;
 	dsp::SchmittTrigger clockTrigger, gateTriggers[kMaxVoices];
 	dsp::PulseGenerator trigPulses[kMaxVoices], eocPulses[kMaxVoices];
 	dsp::ClockDivider paramDivider;
@@ -62,6 +66,8 @@ struct Spools : Module {
 	std::atomic<bool> eco{false};
 	std::atomic<bool> embedAudio{true};
 	std::atomic<bool> retriggerPerNote{false};
+	std::atomic<float> barBeats{0};      // 0 = from the loop's meter
+	std::atomic<int> barsPerCycle{0};    // automatic CONT every N bars; 0 = never
 	spools::SliceSettings slicing;  // UI thread only; workers get a copy
 	spools::CropSpec::Unit cropUnit = spools::CropSpec::Seconds;  // unit shown in the crop fields
 	spools::TapTempo tapTempo;

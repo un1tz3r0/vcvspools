@@ -109,6 +109,34 @@ void tempoMenu(Menu* menu, Spools* m) {
 	menu->addChild(tap);
 }
 
+// Controls that live on the display's Settings page once it exists (DESIGN §7).
+void playbackMenu(Menu* menu, Spools* m) {
+	auto paramChoice = [=](const char* name, int id, std::vector<std::string> labels) {
+		menu->addChild(createIndexSubmenuItem(name, labels,
+			[=] { return size_t(m->params[id].getValue()); }, [=](size_t i) { m->params[id].setValue(float(i)); }));
+	};
+	paramChoice("Direction", Spools::DIRECTION_PARAM, {"Forward", "Reverse", "Ping-pong", "Random"});
+	paramChoice("Tail", Spools::TAIL_PARAM, {"Ring", "Cut"});
+	std::vector<std::string> loops = {"∞"};
+	for (int i = 1; i <= 16; i++) loops.push_back(std::to_string(i));
+	paramChoice("Loop count", Spools::LOOP_COUNT_PARAM, loops);
+}
+
+void transportMenu(Menu* menu, Spools* m) {
+	std::vector<std::string> bars = {"From loop"};
+	std::vector<float> beats = {0};
+	for (int b : {2, 3, 4, 5, 6, 7, 8, 12, 16}) { bars.push_back(string::f("%d beats", b)); beats.push_back(float(b)); }
+	menu->addChild(createIndexSubmenuItem("Bar length", bars,
+		[=] { return size_t(std::find(beats.begin(), beats.end(), m->barBeats.load()) - beats.begin()) % beats.size(); },
+		[=](size_t i) { m->barBeats = beats[i]; }));
+	std::vector<std::string> cycles = {"∞ (CONT input only)"};
+	std::vector<int> counts = {0};
+	for (int n : {1, 2, 4, 8, 16, 32, 64}) { cycles.push_back(string::f("%d bar%s", n, n == 1 ? "" : "s")); counts.push_back(n); }
+	menu->addChild(createIndexSubmenuItem("Bars per cycle", cycles,
+		[=] { return size_t(std::find(counts.begin(), counts.end(), m->barsPerCycle.load()) - counts.begin()) % counts.size(); },
+		[=](size_t i) { m->barsPerCycle = counts[i]; }));
+}
+
 // Each change re-slices right away, so the menu doubles as a preview.
 void slicingMenu(Menu* menu, Spools* m) {
 	auto choice = [=](const char* name, std::vector<std::string> labels, std::vector<double> values, auto get, auto set) {
@@ -171,11 +199,11 @@ struct SpoolsWidget : ModuleWidget {
 				addInput(createInputCentered<ThemedPJ301MPort>(Vec(col(i), kCvY), module, cols[i].input));
 			}
 		}
-		addParam(createParamCentered<CKSS>(Vec(col(7), kCvY - 6), module, S::TAIL_PARAM));
-		labels->labels.push_back({col(7), kAttY - 2, "CUT"});
-		labels->labels.push_back({col(7), kCvY + 22, "RING"});
-		addParam(createParamCentered<RoundSmallBlackKnob>(Vec(col(9), kCvY - 6), module, S::DIRECTION_PARAM));
-		labels->labels.push_back({col(9), kAttY - 2, "DIR"});
+		// Region knobs sit under the two columns without CV; direction, tail and loop count are in the menu.
+		addParam(createParamCentered<RoundSmallBlackKnob>(Vec(col(7), kCvY - 8), module, S::REGION_START_PARAM));
+		labels->labels.push_back({col(7), kAttY, "FROM"});
+		addParam(createParamCentered<RoundSmallBlackKnob>(Vec(col(9), kCvY - 8), module, S::REGION_END_PARAM));
+		labels->labels.push_back({col(9), kAttY, "TO"});
 
 		// Tone strip: groups of controls with one label centred over each group.
 		float x = 28;
@@ -200,19 +228,12 @@ struct SpoolsWidget : ModuleWidget {
 		adsr("FILTER ENV", S::FILTER_A_PARAM);
 		adsr("AMP ENV", S::AMP_A_PARAM);
 
-		const float inX[] = {34, 78, 122};
-		const int ins[] = {S::VOCT_INPUT, S::GATE_INPUT, S::CLOCK_INPUT};
-		const char* inLabels[] = {"V/OCT", "GATE", "CLOCK"};
-		for (int i = 0; i < 3; i++) {
-			addInput(createInputCentered<ThemedPJ301MPort>(Vec(inX[i], kBottomY), module, ins[i]));
-			labels->labels.push_back({inX[i], kBottomY - 18, inLabels[i]});
-		}
-		const float regX[] = {170, 210, 250};
-		const int regs[] = {S::REGION_START_PARAM, S::REGION_END_PARAM, S::LOOP_COUNT_PARAM};
-		const char* regLabels[] = {"FROM", "TO", "LOOPS"};
-		for (int i = 0; i < 3; i++) {
-			addParam(createParamCentered<RoundSmallBlackKnob>(Vec(regX[i], kBottomY), module, regs[i]));
-			labels->labels.push_back({regX[i], kBottomY - 18, regLabels[i]});
+		const int ins[] = {S::VOCT_INPUT, S::GATE_INPUT, S::CLOCK_INPUT, S::RUN_INPUT, S::CONT_INPUT, S::BAR_INPUT};
+		const char* inLabels[] = {"V/OCT", "GATE", "CLOCK", "RUN", "CONT", "BAR"};
+		for (int i = 0; i < 6; i++) {
+			float x = 32 + 40 * i;
+			addInput(createInputCentered<ThemedPJ301MPort>(Vec(x, kBottomY), module, ins[i]));
+			labels->labels.push_back({x, kBottomY - 18, inLabels[i]});
 		}
 		const int outs[] = {S::LEFT_OUTPUT, S::RIGHT_OUTPUT, S::SLICE_OUTPUT, S::TRIG_OUTPUT, S::EOC_OUTPUT,
 			S::AMP_ENV_OUTPUT, S::FILTER_ENV_OUTPUT};
@@ -242,6 +263,8 @@ struct SpoolsWidget : ModuleWidget {
 		menu->addChild(createIndexSubmenuItem("Clock resolution", labels,
 			[=] { return size_t(std::find(ppqns.begin(), ppqns.end(), m->ppqn.load()) - ppqns.begin()); },
 			[=](size_t i) { m->ppqn = ppqns[i]; }));
+		menu->addChild(createSubmenuItem("Playback", "", [=](Menu* sub) { playbackMenu(sub, m); }));
+		menu->addChild(createSubmenuItem("Transport", "", [=](Menu* sub) { transportMenu(sub, m); }));
 		menu->addChild(createIndexSubmenuItem("Envelope retrigger", {"Each slice", "Each note"},
 			[=] { return size_t(m->retriggerPerNote.load()); }, [=](size_t i) { m->retriggerPerNote = i == 1; }));
 		menu->addChild(createBoolMenuItem("Eco interpolation (8 taps)", "", [=] { return m->eco.load(); }, [=](bool b) { m->eco = b; }));

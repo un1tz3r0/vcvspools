@@ -2,6 +2,12 @@
 
 Versions follow `TODO.md`: each `2.N.p` heading is one task, and the last one in a milestone is the released version.
 
+## 2.5.1
+
+- Loop transport (`core/transport.hpp`): RUN gate (unpatched = running, rising edge restarts), CONT (restarts on the next clock edge, or at once when free-running), BAR (realigns the bar phase only), and an automatic CONT every *bars per cycle* bars at exact bar multiples.
+- RUN, CONT and BAR inputs. **Transport** menu with bar length (from the loop's meter by default) and bars per cycle (1–64 or ∞), saved in the patch. Loop mode uses them in 2.5.2.
+- Panel (interim until 2.6.1): FROM/TO moved under DUR and BPM. Direction, tail and loop count moved to a **Playback** menu, as DESIGN §7 puts them on the display.
+
 ## 2.4.3
 
 - Parameter resolution in one place: knob + CV·amount + per-slice offset, clamped per parameter (`core/params.hpp`).

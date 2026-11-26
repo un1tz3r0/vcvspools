@@ -69,6 +69,9 @@ Spools::Spools() {
 	envTime(AMP_R_PARAM, 0.f, "Amp release");
 	configOutput(AMP_ENV_OUTPUT, "Amp envelope (0–10 V)");
 	configOutput(FILTER_ENV_OUTPUT, "Filter envelope (0–10 V)");
+	configInput(RUN_INPUT, "Run (gate; unpatched = always running)");
+	configInput(CONT_INPUT, "Continue (trigger: restart at the start slice on the next clock)");
+	configInput(BAR_INPUT, "Bar (trigger: realign the bar phase)");
 	configInput(CUTOFF_INPUT, "Cutoff CV (1 V/oct at 100%)");
 	configInput(RES_INPUT, "Resonance CV (10 V = 100%)");
 	configInput(PITCH_INPUT, "Pitch CV (1 V/oct)");
@@ -170,6 +173,8 @@ void Spools::onReset(const ResetEvent& e) {
 	eco = false;
 	embedAudio = true;
 	retriggerPerNote = false;
+	barBeats = 0;
+	barsPerCycle = 0;
 	slicing = {};
 	cropUnit = CropSpec::Seconds;
 }
@@ -183,6 +188,19 @@ void Spools::process(const ProcessArgs& args) {
 	timebase.setFallbackBpm(manualBpm >= 1.f ? manualBpm : l ? l->bpm : 120.0);
 	timebase.process(clockConnected, edge, args.sampleTime);
 	currentBpm = float(timebase.bpm());
+	{
+		Transport::In in;
+		in.runConnected = inputs[RUN_INPUT].isConnected();
+		runTrigger.process(inputs[RUN_INPUT].getVoltage(), 0.1f, 1.f);
+		in.run = runTrigger.isHigh();
+		in.cont = contTrigger.process(inputs[CONT_INPUT].getVoltage(), 0.1f, 1.f);
+		in.bar = barTrigger.process(inputs[BAR_INPUT].getVoltage(), 0.1f, 1.f);
+		in.clocked = clockConnected;
+		in.clockEdge = edge;
+		float bb = barBeats;
+		double bar = bb > 0 ? bb : l ? 4.0 * l->meterNum / std::max(1, l->meterDen) : 4.0;
+		transportState = transport.process(timebase.phase(), in, bar, barsPerCycle);
+	}
 
 	const int channels = std::max({1, inputs[VOCT_INPUT].getChannels(), inputs[GATE_INPUT].getChannels()});
 	for (int id = 0; id < OUTPUTS_LEN; id++) outputs[id].setChannels(channels);
@@ -315,6 +333,8 @@ json_t* Spools::dataToJson() {
 	json_object_set_new(root, "eco", json_boolean(eco));
 	json_object_set_new(root, "embedAudio", json_boolean(embedAudio));
 	json_object_set_new(root, "retriggerPerNote", json_boolean(retriggerPerNote));
+	json_object_set_new(root, "barBeats", json_real(barBeats));
+	json_object_set_new(root, "barsPerCycle", json_integer(barsPerCycle));
 	json_t* js = json_object();
 	json_object_set_new(js, "mode", json_integer(int(slicing.mode)));
 	json_object_set_new(js, "gridBeats", json_real(slicing.gridBeats));
@@ -350,6 +370,8 @@ void Spools::dataFromJson(json_t* root) {
 	if (json_t* x = json_object_get(root, "eco")) eco = json_is_true(x);
 	if (json_t* x = json_object_get(root, "embedAudio")) embedAudio = json_is_true(x);
 	if (json_t* x = json_object_get(root, "retriggerPerNote")) retriggerPerNote = json_is_true(x);
+	if (json_t* x = json_object_get(root, "barBeats")) barBeats = clamp(float(json_number_value(x)), 0.f, 64.f);
+	if (json_t* x = json_object_get(root, "barsPerCycle")) barsPerCycle = clamp(int(json_integer_value(x)), 0, 64);
 	if (json_t* js = json_object_get(root, "slicing")) {
 		slicing.mode = SliceMode(clamp(int(json_integer_value(json_object_get(js, "mode"))), 0, 2));
 		if (json_t* x = json_object_get(js, "gridBeats")) slicing.gridBeats = std::min(std::max(json_number_value(x), 1.0 / 64), 4.0);
