@@ -68,6 +68,11 @@ private:
 	Smoother gain[2], pitch, cutoff, res;    // gain is linear
 	int controlCountdown = 0, targetCountdown = 0;
 	bool released = false;
+	// Cached control-rate work: the glide coefficient, the last pitch sent and the last filter setting.
+	float glideRate = 0, glideCoef = 0, lastPitch = 0;
+	struct { FilterType type = FilterType::Off; float cutoff = -99, res = -1, rate = 0; } filterSet;
+	int quiet = 0;  // samples of silence with no player active
+	static constexpr int kQuietAfter = 4800;  // the filter's tail at the highest resonance is shorter
 	const Loop* loop = nullptr;
 	VoiceFilter filter;
 	Adsr amp[2], fenv;  // one amp envelope per player, so an outgoing slice keeps its own

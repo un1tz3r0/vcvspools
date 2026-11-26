@@ -16,7 +16,12 @@ public:
 
 	// Coefficients for fractional offset `frac` in [0, 1) at read rate `rate` (source frames per output sample).
 	// Tap k weights source frame floor(x) - taps/2 + 1 + k.
-	const float* kernel(double frac, double rate) const;
+	const float* kernel(double frac, double rate) const { return kernel(frac, band(rate)); }
+	// The same, split so the band (which depends only on the rate) can be looked up once per rate change.
+	int band(double rate) const;
+	const float* kernel(double frac, int band) const {
+		return &table[(size_t(band) * (kPhases + 1) + size_t(frac * kPhases + 0.5)) * size_t(n)];
+	}
 
 	static const SincTable& hq();   // 16 taps
 	static const SincTable& eco();  // 8 taps

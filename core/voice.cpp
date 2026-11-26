@@ -16,6 +16,8 @@ void Voice::reset() {
 	amp[0].reset();
 	amp[1].reset();
 	fenv.reset();
+	quiet = 0;
+	filterSet = {};
 }
 
 SlicePlayer::LoopPoints loopPoints(const Loop& l, size_t i, const SlicePlayer::Span& span, const VoiceParams& vp, TailMode tail) {
@@ -79,6 +81,8 @@ void Voice::begin(int slice, bool phraseStart, double slotSeconds, const Loop& l
 	players[cur].setQuality(vp.quality);
 	players[cur].start(l.audio.get(), span, rateBase * semitonesToRatio(r.pitch), engineRate);
 	const double gate = slotSeconds * std::clamp(vp.duration, 0.05f, 1.f);
+	lastPitch = r.pitch;
+	quiet = 0;
 	if (r.tail == TailMode::Loop || r.tail == TailMode::AutoLoop) players[cur].setLoop(loopPoints(l, size_t(slice), span, vp, r.tail));
 	if (r.tail == TailMode::Stretch)
 		players[cur].setStretch(stretchPlan(l, size_t(slice), span, vp, gate * engineRate, rateBase * semitonesToRatio(r.pitch)));
@@ -128,16 +132,35 @@ VoiceOut Voice::play(const SeqEvent& e, double beatPeriod, const Loop& l, const 
 
 	const float dt = 1.f / engineRate;
 	const float fe = fenv.process(vp.filterEnv, dt);
+	if (quiet >= kQuietAfter && !players[0].active() && !players[1].active()) {
+		// Nothing has sounded for a while and the filter has rung out: only the envelope outputs move.
+		amp[0].process(vp.ampEnv, dt);
+		amp[1].process(vp.ampEnv, dt);
+		out.ampEnv = amp[cur].value();
+		out.filterEnv = fe;
+		out.slice = lastSlice;
+		controlCountdown = targetCountdown = 0;  // refresh everything on the next sound
+		return out;
+	}
 	if (--targetCountdown <= 0) {
 		updateTargets(l, vp);
 		targetCountdown = kTargetEvery;
 	}
 	if (--controlCountdown <= 0) {
-		const float c = Smoother::coef(kGlide, kControlEvery * dt);
+		if (engineRate != glideRate) { glideRate = engineRate; glideCoef = Smoother::coef(kGlide, kControlEvery * dt); }
+		const float c = glideCoef;
 		gain[0].step(c);
 		gain[1].step(c);
-		if (players[cur].active()) players[cur].setRate(rateBase * semitonesToRatio(pitch.step(c)));
-		filter.set(vp.filter, cutoff.step(c) + vp.filterEnvAmount * fe, res.step(c), engineRate);
+		const float st = pitch.step(c);
+		if (players[cur].active() && st != lastPitch) {
+			lastPitch = st;
+			players[cur].setRate(rateBase * semitonesToRatio(st));
+		}
+		const float fc = cutoff.step(c) + vp.filterEnvAmount * fe, fr = res.step(c);
+		if (vp.filter != filterSet.type || fc != filterSet.cutoff || fr != filterSet.res || engineRate != filterSet.rate) {
+			filterSet = {vp.filter, fc, fr, engineRate};
+			filter.set(vp.filter, fc, fr, engineRate);
+		}
 		controlCountdown = kControlEvery;
 	}
 
@@ -157,6 +180,7 @@ VoiceOut Voice::play(const SeqEvent& e, double beatPeriod, const Loop& l, const 
 	out.right = filter.process(1, r0);
 	out.slice = lastSlice;
 	out.playing = players[0].active() || players[1].active();
+	quiet = !out.playing && std::fabs(out.left) + std::fabs(out.right) < 1e-6f ? quiet + 1 : 0;
 	return out;
 }
 

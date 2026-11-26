@@ -33,9 +33,11 @@ public:
 				break;
 			case Decay:
 			case Sustain: {
-				float s = std::fmin(std::fmax(t.s, 0.f), 1.f);
+				float s = t.s < 0 ? 0.f : t.s > 1 ? 1.f : t.s;
+				if (stage == Sustain && level == s) break;  // settled: nothing to compute
 				level = t.d <= dt ? s : s + (level - s) * coef(t.d, dt, kSpan);
-				stage = std::fabs(level - s) < 1e-4f ? Sustain : Decay;
+				if (std::fabs(level - s) < 1e-4f) { level = s; stage = Sustain; }
+				else stage = Decay;
 				break;
 			}
 			case Release:
@@ -53,7 +55,15 @@ private:
 	static constexpr float kSpan = 6.9077553f;        // ln(1000)
 	Stage stage = Idle;
 	float level = 0;
-	static float coef(float seconds, float dt, float span) { return std::exp(-span * dt / seconds); }
+	// Segment coefficient, recomputed only when the time, rate or segment changes (exp per sample adds up).
+	float cSeconds = -1, cDt = 0, cSpan = 0, cValue = 0;
+	float coef(float seconds, float dt, float span) {
+		if (seconds != cSeconds || dt != cDt || span != cSpan) {
+			cSeconds = seconds, cDt = dt, cSpan = span;
+			cValue = std::exp(-span * dt / seconds);
+		}
+		return cValue;
+	}
 };
 
 }

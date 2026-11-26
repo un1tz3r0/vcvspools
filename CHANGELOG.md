@@ -2,6 +2,16 @@
 
 Versions follow `TODO.md`: each `2.N.p` heading is one task, and the last one in a milestone is the released version.
 
+## 2.8.1
+
+- `make bench`: 16 voices at 48 kHz in Ring, Auto-loop and Stretch modes, best and eco quality, with and without a filter, plus an idle case. It uses Rack's optimisation flags and reports % of one core and ns per voice-sample (results in docs/development.md).
+- About twice as fast as 2.7.5:
+  - one sinc kernel lookup per frame instead of one per channel, with the cutoff band cached per rate and fixed-size dot products;
+  - envelope, glide and filter coefficients recomputed only when their inputs change;
+  - a Hann table for grains;
+  - voices that have been silent for 0.1 s skip everything but their envelopes.
+- On the 2.1 GHz development VM, Ring uses 3.2 % of one core and Stretch about 4.5–5 %, which is just over the 3 % target. It hasn't been measured on a desktop CPU yet.
+
 ## 2.7.5
 
 - **Stretch** tail: granular time-stretch and squeeze that fits each slice to its gate at the original pitch (DESIGN §6.5). The attack keeps its timing, and the rest plays as 50 %-overlapping Hann grains. For pitched slices, grains are about three periods long and start a whole number of periods from the grain they overlap, so they reinforce instead of beating. Unpitched slices use 40 ms grains with jitter. The first and last grains join the plain playback at full level.

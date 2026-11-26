@@ -1,5 +1,7 @@
 #include "sliceplayer.hpp"
 #include <algorithm>
+#include <array>
+#include <type_traits>
 #include <cmath>
 
 namespace spools {
@@ -16,6 +18,7 @@ void SlicePlayer::start(const Audio* a, Span sp, double r, float engineRate) {
 	audio = a;
 	s = sp;
 	rate = r;
+	band = sinc->band(r);
 	pos = s.reverse ? s.end - 1 : s.start;
 	loopOn = false;
 	stretchOn = inGrains = spawnDone = false;
@@ -70,6 +73,19 @@ void SlicePlayer::spawn() {
 	nextSpawn += hopOut;
 }
 
+// sin^2(pi x) for x in [0, 1], from a table: grains need one per sample each.
+static float hann(double x) {
+	static const auto table = [] {
+		std::array<float, 513> t{};
+		for (size_t i = 0; i < t.size(); i++) t[i] = float(std::pow(std::sin(M_PI * double(i) / 512), 2));
+		return t;
+	}();
+	const double p = std::clamp(x, 0.0, 1.0) * 512;
+	const size_t i = std::min(size_t(p), size_t(511));
+	const float f = float(p - double(i));
+	return table[i] + (table[i + 1] - table[i]) * f;
+}
+
 void SlicePlayer::processGrains(float& l, float& r) {
 	float acc[2] = {0, 0};
 	for (Grain& g : grains) {
@@ -77,15 +93,17 @@ void SlicePlayer::processGrains(float& l, float& r) {
 		const double x = g.done / st.grain;
 		// Hann grains at 50% overlap sum to one. The first grain enters at full level (it continues the
 		// native part) and the last one leaves at full level (the span's own end fade takes over).
-		float w = (g.first && x < 0.5) || (g.last && x >= 0.5) ? 1.f : float(std::pow(std::sin(M_PI * x), 2));
-		acc[0] += read(0, g.src) * w;
-		if (audio->channels > 1) acc[1] += read(1, g.src) * w;
+		const float w = (g.first && x < 0.5) || (g.last && x >= 0.5) ? 1.f : hann(x);
+		float a, b;
+		read(g.src, a, b);
+		acc[0] += a * w;
+		acc[1] += b * w;
 		g.src += rate;
 		g.done += rate;
 		if (g.done >= st.grain && !g.last) g.active = false;
 	}
 	l = acc[0];
-	r = audio->channels > 1 ? acc[1] : acc[0];
+	r = acc[1];
 	pos = grains[newest].src;
 	outDone += 1;
 	nextSpawn -= 1;
@@ -101,23 +119,31 @@ double SlicePlayer::progress() const {
 	return len > 0 ? std::clamp((s.reverse ? s.end - 1 - pos : pos - s.start) / len, 0.0, 1.0) : 1.0;
 }
 
-float SlicePlayer::read(int c, double x) const {
-	const float* d = audio->channel(c);
-	long i0 = long(std::floor(x));
-	const int n = sinc->taps();
-	const float* k = sinc->kernel(x - i0, rate);
-	long first = i0 - n / 2 + 1;
-	float acc = 0;
+void SlicePlayer::read(double x, float& l, float& r) const {
+	const long i0 = long(std::floor(x)), n = sinc->taps(), first = i0 - n / 2 + 1;
+	const float* k = sinc->kernel(x - double(i0), band);
+	const float* d0 = audio->channel(0);
+	const float* d1 = audio->channels > 1 ? audio->channel(1) : nullptr;
+	float a = 0, b = 0;
 	if (first >= 0 && first + n <= long(audio->frames)) {
-		for (int t = 0; t < n; t++) acc += k[t] * d[first + t];
+		// Fixed tap counts let the compiler unroll and vectorise the dot products.
+		auto dot = [&](auto taps) {
+			for (long t = 0; t < taps; t++) a += k[t] * d0[first + t];
+			if (d1) for (long t = 0; t < taps; t++) b += k[t] * d1[first + t];
+		};
+		if (n == 16) dot(std::integral_constant<long, 16>());
+		else if (n == 8) dot(std::integral_constant<long, 8>());
+		else dot(n);
 	}
-	else {
-		for (int t = 0; t < n; t++) {
-			long j = first + t;
-			if (j >= 0 && j < long(audio->frames)) acc += k[t] * d[j];
+	else
+		for (long t = 0; t < n; t++) {
+			const long j = first + t;
+			if (j < 0 || j >= long(audio->frames)) continue;
+			a += k[t] * d0[j];
+			if (d1) b += k[t] * d1[j];
 		}
-	}
-	return acc;
+	l = a;
+	r = d1 ? b : a;
 }
 
 bool SlicePlayer::process(float& l, float& r) {
@@ -148,14 +174,17 @@ bool SlicePlayer::process(float& l, float& r) {
 		r *= g;
 		return true;
 	}
-	l = read(0, pos) * g;
-	r = audio->channels > 1 ? read(1, pos) * g : l;
+	read(pos, l, r);
+	l *= g;
+	r *= g;
 	if (loopOn && lp.xfade > 0 && pos > lp.end - lp.xfade) {
 		// Approaching the loop end: blend in the audio just before the loop start, which it will jump to.
 		const double back = pos - (lp.end - lp.start);
 		const float t = float((pos - (lp.end - lp.xfade)) / lp.xfade), a = 0.5f + 0.5f * std::cos(3.14159265f * t);
-		l = l * a + read(0, back) * g * (1 - a);
-		r = audio->channels > 1 ? r * a + read(1, back) * g * (1 - a) : l;
+		float bl, br;
+		read(back, bl, br);
+		l = l * a + bl * g * (1 - a);
+		r = r * a + br * g * (1 - a);
 	}
 	if (!loopOn) {
 		pos += s.reverse ? -rate : rate;

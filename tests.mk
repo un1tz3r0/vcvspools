@@ -15,3 +15,12 @@ test: build/host/run-tests
 
 .PHONY: test
 -include $(HOST_OBJ:.o=.d)
+
+# make bench: release build of core/ plus bench/, with Rack's optimisation flags.
+BENCH_FLAGS := -std=c++17 -pthread -O3 -march=nehalem -funsafe-math-optimizations -Icore -Ivendor
+bench: $(wildcard core/*.cpp) $(wildcard core/*.hpp) bench/bench.cpp
+	@mkdir -p build/bench
+	$(CXX) $(BENCH_FLAGS) $(wildcard core/*.cpp) bench/bench.cpp -o build/bench/bench
+	build/bench/bench
+
+.PHONY: bench

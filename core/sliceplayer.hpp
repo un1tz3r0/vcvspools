@@ -39,8 +39,8 @@ public:
 	// Loops [start, end) until stop(); forward spans only. Call right after start().
 	void setLoop(LoopPoints lp);
 	bool looping() const { return loopOn; }
-	void setRate(double r) { rate = r; }
-	void setQuality(const SincTable* t) { sinc = t; }
+	void setRate(double r) { if (r != rate) { rate = r; band = sinc->band(r); } }
+	void setQuality(const SincTable* t) { sinc = t; band = t->band(rate); }
 	// Fades out over `seconds` (at least the declick time) and goes idle.
 	void stop(float seconds = kDeclick);
 
@@ -62,7 +62,8 @@ private:
 	bool loopOn = false;
 	double dir = 1;
 	float gain = 0, fadeStep = 0, declickStep = 0, sampleRate = 48000;
-	float read(int channel, double x) const;
+	int band = 0;  // sinc cutoff for the current rate
+	void read(double x, float& l, float& r) const;  // both channels (r = l for mono)
 
 	struct Grain { double src = 0, done = 0; bool active = false, first = false, last = false; };
 	StretchPlan st;
