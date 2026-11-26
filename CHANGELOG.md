@@ -2,6 +2,10 @@
 
 Versions follow `TODO.md`: each `2.N.p` heading is one task, and the last one in a milestone is the released version.
 
+## 2.2.1
+
+- `TimeBase`: a beat clock in quarter notes. Tempo comes from CLOCK pulses at 1–96 PPQN, with a median-of-three filter that rejects jitter and follows real tempo jumps at once. The phase locks to pulses and never runs past a late pulse. With no clock patched it falls back to the manual or loop BPM.
+
 ## 2.1.5
 
 - `Loop` model: a non-destructive crop of the source file, a sorted slice map with beat positions and per-slice parameters, the loop region, and a min/max waveform pyramid for drawing.
