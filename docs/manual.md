@@ -5,7 +5,7 @@ Spools is an early proof of concept. See `DESIGN.md` for the planned behaviour a
 ## Quick start
 
 1. Right-click the module and choose **Load sample…**. Pick a WAV/AIFF/FLAC/MP3/Ogg file or a REX2 loop.
-2. Plain audio is sliced automatically at its hits, and its tempo is estimated (shown with a `?`). REX and Acidized files keep their own slices and tempo. Right-click → **Auto-slice** to change how it is cut, or **Slice evenly** for equal slices.
+2. Plain audio is sliced automatically at its hits, and its tempo is estimated (shown with a `?`). REX and Acidized files keep their own slices and tempo. Use the SETTINGS page (Slice by, Grid, Sensitivity, Grid snap) to change how it is cut, or **Slice evenly** for equal slices.
 3. Patch a gate or trigger into **GATE**. C4 (0 V) on **V/OCT** plays the start slice, and each semitone up or down plays the next or previous slice.
 4. Patch a clock into **CLOCK** and set its resolution in the menu. Without one, Spools uses the **BPM** knob, or the loop's own tempo when the knob is at 0.
 
