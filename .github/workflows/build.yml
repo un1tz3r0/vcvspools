@@ -9,9 +9,68 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  RACK_SDK_VERSION: 2.6.6
+
 jobs:
+  changes:
+    name: Changes
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Detect code changes
+        id: diff
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if [ -z "$BASE" ] || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            echo "code=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          if git diff --name-only "$BASE" HEAD | grep -qvE '^(docs/.*|[^/]*\.md|LICENSE)$'; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "code=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Require a version bump for code changes
+        if: github.event_name == 'pull_request' && steps.diff.outputs.code == 'true'
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          old=$(git show "$BASE:plugin.json" | jq -er .version)
+          new=$(jq -er .version plugin.json)
+          python3 - "$old" "$new" <<'PY'
+          import re, sys
+          old, new = sys.argv[1:]
+          pat = r"2\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)"
+          if not re.fullmatch(pat, new):
+              sys.exit(f"Version {new} must use the Rack 2 format 2.minor.patch")
+          if tuple(map(int, new.split("."))) <= tuple(map(int, old.split("."))):
+              sys.exit(f"Code changed: plugin.json version must increase (main has {old}, PR has {new})")
+          print(f"Version {old} -> {new}")
+          PY
+
+  test:
+    name: Test
+    needs: changes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        if: needs.changes.outputs.code == 'true'
+      - name: Run core tests
+        if: needs.changes.outputs.code == 'true'
+        run: make -j4 test
+
   build:
     name: Build ${{ matrix.platform }}
+    needs: [changes, test]
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -26,54 +85,69 @@ jobs:
           - os: macos-latest
             platform: mac-x64
             cross: x86_64-apple-darwin
+    env:
+      CODE: ${{ needs.changes.outputs.code }}
     steps:
       - uses: actions/checkout@v4
+        if: env.CODE == 'true'
       - name: Install Linux packaging tools
-        if: matrix.platform == 'lin-x64'
+        if: env.CODE == 'true' && matrix.platform == 'lin-x64'
         run: sudo apt-get update && sudo apt-get install -y jq zstd
       - name: Install macOS packaging tools
-        if: startsWith(matrix.platform, 'mac-')
+        if: env.CODE == 'true' && startsWith(matrix.platform, 'mac-')
         run: |
           brew install gnu-tar zstd jq
           echo "$(brew --prefix)/opt/gnu-tar/libexec/gnubin" >> "$GITHUB_PATH"
       - name: Install Windows build tools
-        if: matrix.platform == 'win-x64'
+        if: env.CODE == 'true' && matrix.platform == 'win-x64'
         uses: msys2/setup-msys2@v2
         with:
           msystem: MINGW64
-          install: mingw-w64-x86_64-gcc make jq tar zstd
+          install: mingw-w64-x86_64-gcc make jq tar zstd unzip
+      - name: Cache Rack SDK
+        if: env.CODE == 'true'
+        id: sdk-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/Rack-SDK
+          key: rack-sdk-${{ env.RACK_SDK_VERSION }}-${{ matrix.platform }}
       - name: Download Rack SDK
+        if: env.CODE == 'true' && steps.sdk-cache.outputs.cache-hit != 'true'
         shell: bash
         run: |
-          curl --fail --location --retry 3 "https://vcvrack.com/downloads/Rack-SDK-2.6.6-${{ matrix.platform }}.zip" -o "$RUNNER_TEMP/rack-sdk.zip"
+          curl --fail --location --retry 3 "https://vcvrack.com/downloads/Rack-SDK-${RACK_SDK_VERSION}-${{ matrix.platform }}.zip" -o "$RUNNER_TEMP/rack-sdk.zip"
           unzip -q "$RUNNER_TEMP/rack-sdk.zip" -d "$RUNNER_TEMP"
       - name: Build and package (Unix)
-        if: matrix.platform != 'win-x64'
+        if: env.CODE == 'true' && matrix.platform != 'win-x64'
         env:
           CROSS_COMPILE: ${{ matrix.cross }}
         run: |
           jq -e '.version | strings | test("^2\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$")' plugin.json
-          make -j2 dist RACK_DIR="$RUNNER_TEMP/Rack-SDK"
+          make -j3 dist RACK_DIR="$RUNNER_TEMP/Rack-SDK"
           test -f dist/Spools-*-${{ matrix.platform }}.vcvplugin
       - name: Build and package (Windows)
-        if: matrix.platform == 'win-x64'
+        if: env.CODE == 'true' && matrix.platform == 'win-x64'
         shell: msys2 {0}
         run: |
           jq -e '.version | strings | test("^2\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$")' plugin.json
-          make -j2 dist RACK_DIR="$(cygpath -u "$RUNNER_TEMP")/Rack-SDK"
+          make -j3 dist RACK_DIR="$(cygpath -u "$RUNNER_TEMP")/Rack-SDK"
           test -f dist/Spools-*-win-x64.vcvplugin
       - uses: actions/upload-artifact@v4
+        if: env.CODE == 'true'
         with:
           name: spools-${{ matrix.platform }}
           path: dist/*.vcvplugin
           if-no-files-found: error
 
   release:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.changes.outputs.code == 'true'
+    needs: [changes, build]
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    concurrency:
+      group: release
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
         with:
@@ -99,8 +173,32 @@ jobs:
           if old and tuple(map(int, new.split("."))) < tuple(map(int, old.split("."))):
               sys.exit("The plugin version cannot decrease")
           print("publish=" + str(not old or new != old).lower())
+          print("old=" + old)
           print("tag=v" + new)
           PY
+      - name: Release notes from CHANGELOG.md
+        if: steps.version.outputs.publish == 'true'
+        env:
+          OLD: ${{ steps.version.outputs.old }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          python3 - "$OLD" "${TAG#v}" > "$RUNNER_TEMP/notes.md" <<'PY'
+          import re, sys
+          key = lambda v: tuple(map(int, v.split(".")))
+          old, new = sys.argv[1], sys.argv[2]
+          out, keep = [], False
+          for line in open("CHANGELOG.md", encoding="utf-8"):
+              m = re.match(r"^## \[?(\d+\.\d+\.\d+)\]?", line)
+              if m:
+                  v = m.group(1)
+                  keep = key(v) <= key(new) and (not old or key(v) > key(old))
+              elif line.startswith("# "):
+                  keep = False
+              if keep:
+                  out.append(line)
+          print("".join(out).strip() or f"Spools v{new}")
+          PY
+          cat "$RUNNER_TEMP/notes.md"
       - name: Download packages
         if: steps.version.outputs.publish == 'true'
         uses: actions/download-artifact@v4
@@ -130,6 +228,6 @@ jobs:
             git push origin "refs/tags/$TAG"
           fi
           if ! gh release view "$TAG" >/dev/null 2>&1; then
-            gh release create "$TAG" --verify-tag --title "$TAG" --notes "Spools $TAG"
+            gh release create "$TAG" --verify-tag --title "Spools $TAG" --notes-file "$RUNNER_TEMP/notes.md"
           fi
           gh release upload "$TAG" dist/*.vcvplugin --clobber
