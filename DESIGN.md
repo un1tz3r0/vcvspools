@@ -7,7 +7,7 @@ Status: draft for sign-off. Implementation order lives in `TODO.md`.
 ## 1. Goals and non-goals
 
 **Goals**
-- Import REX (`.rex`, `.rx2`, `.rcy`, unofficial), WAV, AIFF, FLAC, MP3 and Ogg Vorbis. Read slice and tempo metadata from Acidized WAV (`acid`, `smpl`, `cue `, `LIST/adtl`).
+- Import REX2 (`.rx2`, unofficial), WAV, AIFF, FLAC, MP3 and Ogg Vorbis. Read slice and tempo metadata from Acidized WAV (`acid`, `smpl`, `cue `, `LIST/adtl`).
 - Crop any region of the source file, by offset+duration in beats (at a BPM), seconds or samples.
 - Detect tempo, or take a manual BPM. Slice on onsets, on a beat grid, or both, with adjustable onset sensitivity and grid-snap strength.
 - Trigger slices from poly V/oct + gate. C4 (0 V) plays the start slice and each semitone is a slice offset. Each trigger plays `length` slices, timed to the incoming clock.
@@ -82,7 +82,7 @@ Slice beat positions come from the grid (or from REX/Acid metadata). Every timin
 | FLAC | `dr_flac` |
 | MP3 | `dr_mp3` |
 | Ogg Vorbis | `stb_vorbis` |
-| REX/RX2/RCY | `core/rex/`: vendored MIT decoder from [schwung-rex](https://github.com/charlesvestal/schwung-rex) behind a `RexReader` interface. If its coverage falls short, we write our own decoder using the other public references. Labelled *unofficial* in the UI and docs. |
+| REX2 (`.rx2`) | `core/rex.cpp`: our own C++ port of the reverse-engineered IFF + DWOP description in [schwung-rex](https://github.com/charlesvestal/schwung-rex) (MIT), with full 24-bit precision. Labelled *unofficial* in the UI and docs. REX1 `.rex`/`.rcy` use a different, undocumented layout and are not supported yet. |
 
 - **REX import** keeps the decoded audio, the slice positions, the tempo, the bar/beat signature and the loop length. Slice beat positions come from the REX PPQ positions. Ignored: REX envelope settings, transient-stretch settings, and anything else the decoder can't recover.
 - **Acidized WAV import** reads the `acid` chunk (tempo, beats, root note, one-shot flag), `cue ` points with `LIST/adtl/labl` as slices, and `smpl` loops as the loop region. Without `acid`, beats are derived from analysis.
@@ -233,12 +233,12 @@ By default the cropped audio is also written to the module's patch storage direc
 ## 12. Licensing and dependencies
 
 - Spools: GPL-3.0-or-later (`LICENSE` added in the first code milestone).
-- Vendored: dr_wav/dr_flac/dr_mp3 (public domain/MIT-0), stb_vorbis (public domain/MIT), pffft (BSD-like, from Rack's SDK), doctest (MIT, tests only), schwung-rex decoder (MIT, attribution kept in `core/rex/LICENSE`).
+- Vendored: dr_wav/dr_flac/dr_mp3 (public domain/MIT-0), stb_vorbis (public domain/MIT), pffft (BSD-like, from Rack's SDK), doctest (MIT, tests only), schwung-rex format description and reference decoder (MIT; attribution in `vendor/README.md`).
 - REX support is unofficial and unaffiliated with Reason Studios. Docs say so, and bugs go to this repo.
 
 ## 13. Risks
 
-- **REX decoder coverage**: older `.rex`/`.rcy` and compressed variants may not decode. Mitigation: the `RexReader` interface, a clear error on the display, and the Acid WAV path as a fallback.
+- **REX decoder coverage**: REX1 `.rex`/`.rcy` don't decode, and the decoder has only been checked against an independent encoder, not against ReCycle-made files. Mitigation: the `RexReader` interface, a clear error on the display, and the Acid WAV path as a fallback.
 - **CPU**: 16 voices × 2 players × sinc16 + stretch. Mitigation: an eco interpolation option, voices that skip silence, and benchmarks per milestone.
 - **Knob retargeting** fights Rack's param model (the knob shows the selection value while CV modulates the global value). Mitigation: global values live in module state, and the knobs hold only the "current target" value.
 - **Panel space** at 36 HP (§7).

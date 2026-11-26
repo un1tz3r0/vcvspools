@@ -53,7 +53,7 @@ Format sniffFormat(const uint8_t* d, size_t n, const std::string& pathHint) {
 	if (n >= 8 && std::memcmp(d, w64, 8) == 0) return Format::W64;
 	if (at(0, "fLaC")) return Format::Flac;
 	if (at(0, "OggS")) return Format::Vorbis;
-	if (at(0, "CAT ") && at(8, "REX2")) return Format::Rex;
+	if (at(0, "CAT ") && (at(8, "REX2") || at(8, "REX "))) return Format::Rex;
 	if (n >= 3 && std::memcmp(d, "ID3", 3) == 0) return Format::Mp3;
 	if (n >= 2 && d[0] == 0xFF && (d[1] & 0xE0) == 0xE0) return Format::Mp3;
 	std::string ext = fileExtension(pathHint);
