@@ -2,6 +2,14 @@
 
 Versions follow `TODO.md`: each `2.N.p` heading is one task, and the last one in a milestone is the released version.
 
+## 2.1.5
+
+- `Loop` model: a non-destructive crop of the source file, a sorted slice map with beat positions and per-slice parameters, the loop region, and a min/max waveform pyramid for drawing.
+- Crop by samples, seconds or beats at a BPM, clamped to the file.
+- `loadLoop` builds a loop from REX2 (slices and native tempo), Acidized WAV (tempo, cue slices, smpl loop as the region) or plain audio. `recrop` keeps slices and their parameters, and `sliceEvenly` makes equal slices.
+- `Exchange<T>`: lock-free handoff of immutable objects to the audio thread. Retired objects are freed on the producer side.
+- `Worker`: a background job thread. Both are clean under ASan, UBSan and TSan.
+
 ## 2.1.4
 
 - Unofficial REX2 (`.rx2`) import: IFF container and DWOP lossless decoder, mono and L/delta stereo, 16- and 24-bit at full precision. Reads slices (transient markers are dropped), tempo, meter, and bars/beats. The native tempo is derived from the loop length. Bounds-checked and safe on corrupt input.

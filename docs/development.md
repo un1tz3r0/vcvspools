@@ -10,6 +10,12 @@
 | `vendor/` | single-header third-party libraries |
 | `tools/` | fixture generators and scripts |
 
+## Core concepts
+
+- `Audio`: planar float at the file's native rate. `Loop`: the source, a crop, a cropped copy for playback, slices with beat positions, the region, and waveform mips. A `Loop` is immutable once published. An edit builds a new one (`recrop`, `sliceEvenly`, …).
+- `Exchange<Loop>`: the worker publishes and the audio thread `acquire()`s without locking or allocating. Old loops come back through a lock-free queue and are freed on the worker's next `publish`/`collect`.
+- `Worker`: one background thread per module for decoding, analysis and file I/O.
+
 ## Testing
 
 ```sh

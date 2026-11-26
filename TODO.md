@@ -2,12 +2,12 @@
 
 Each top-level item is a minor version (`2.N.0`) and one PR to `main`. Each second-level item is a patch bump (`2.N.p`) and one commit. Per task: tests → code → run tests → fix → update `docs/` and `CHANGELOG.md` → check off here. See `DESIGN.md` for the details behind each item.
 
-- [ ] **2.1 Foundation and import**
+- [x] **2.1 Foundation and import**
   - [x] 2.1.1 Scaffolding: `core/` library, C++17, vendored doctest, `make test`, CI test job, `LICENSE` (GPL-3.0-or-later), `docs/`, `CHANGELOG.md`
   - [x] 2.1.2 Audio decoding: dr_wav (WAV/AIFF/W64), dr_flac, dr_mp3, stb_vorbis → `Audio`; fixture generator `tools/make_fixtures.py`
   - [x] 2.1.3 RIFF metadata: read/write `acid`, `cue `, `LIST/adtl/labl`, `smpl`, `spls`; Acidized WAV exporter; round-trip tests
   - [x] 2.1.4 REX2 import: C++ IFF + DWOP decoder from the schwung-rex spec; slices, PPQ→beats, tempo, signature; licence/attribution; "unofficial" docs
-  - [ ] 2.1.5 `Loop` model: crop (beats/seconds/samples), slice map, waveform mips, worker thread, atomic publish, deferred free
+  - [x] 2.1.5 `Loop` model: crop (beats/seconds/samples), slice map, waveform mips, worker thread, atomic publish, deferred free
 
 - [ ] **2.2 Playback proof of concept**
   - [ ] 2.2.1 Time base: CLOCK + PPQN, smoothing, manual/loop BPM fallback, beat-phase accumulator
