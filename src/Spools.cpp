@@ -1,0 +1,286 @@
+#include "Spools.hpp"
+#include <cmath>
+#include "file.hpp"
+#include "riff.hpp"
+#include "units.hpp"
+
+using namespace spools;
+
+static const double kQuantizeBeats[] = {0, 0.125, 0.25, 0.5, 1, 2, 4};
+static const std::vector<std::string> kQuantizeLabels = {"Off", "1/32", "1/16", "1/8", "1/4", "1/2", "1 bar"};
+
+Spools::Spools() {
+	config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, LIGHTS_LEN);
+	configParam(START_PARAM, 0.f, 1.f, 0.f, "Start slice", "%", 0.f, 100.f);
+	configParam(LENGTH_PARAM, 1.f, 64.f, 1.f, "Length", " slices")->snapEnabled = true;
+	configParam(START_TRIM_PARAM, -0.25f, 0.25f, 0.f, "Start trim", " ms", 0.f, 1000.f);
+	configParam(END_TRIM_PARAM, -0.25f, 0.25f, 0.f, "End trim", " ms", 0.f, 1000.f);
+	configParam(PITCH_PARAM, -24.f, 24.f, 0.f, "Pitch", " st");
+	configParam(VOLUME_PARAM, 0.f, 2.f, 1.f, "Volume", " dB", -10.f, 20.f);
+	configParam(OVERLAP_PARAM, 0.f, 0.05f, 0.005f, "Overlap", " ms", 0.f, 1000.f);
+	configParam(DURATION_PARAM, 0.05f, 1.f, 1.f, "Duration", "%", 0.f, 100.f);
+	configSwitch(QUANTIZE_PARAM, 0.f, 6.f, 0.f, "Launch quantize", kQuantizeLabels);
+	configParam(BPM_PARAM, 0.f, 300.f, 0.f, "Manual BPM (0 = from loop)", " BPM");
+	configParam(REGION_START_PARAM, 0.f, 1.f, 0.f, "Region start", "%", 0.f, 100.f);
+	configParam(REGION_END_PARAM, 0.f, 1.f, 1.f, "Region end", "%", 0.f, 100.f);
+	configParam(LOOP_COUNT_PARAM, 0.f, 16.f, 0.f, "Loop count (0 = forever)")->snapEnabled = true;
+	configSwitch(DIRECTION_PARAM, 0.f, 3.f, 0.f, "Direction", {"Forward", "Reverse", "Ping-pong", "Random"});
+	configSwitch(TAIL_PARAM, 0.f, 1.f, 0.f, "Tail", {"Ring", "Cut"});
+	const int attended[] = {START_PARAM, LENGTH_PARAM, START_TRIM_PARAM, END_TRIM_PARAM, PITCH_PARAM, VOLUME_PARAM, OVERLAP_PARAM, QUANTIZE_PARAM};
+	for (int i = 0; i <= QUANTIZE_ATT_PARAM - START_ATT_PARAM; i++)
+		configParam(START_ATT_PARAM + i, -1.f, 1.f, 0.f, paramQuantities[attended[i]]->name + " CV amount", "%", 0.f, 100.f);
+
+	configInput(VOCT_INPUT, "Slice offset (1 V/oct, C4 = start slice)");
+	configInput(GATE_INPUT, "Gate / trigger");
+	configInput(CLOCK_INPUT, "Clock");
+	configInput(START_INPUT, "Start slice CV");
+	configInput(LENGTH_INPUT, "Length CV");
+	configInput(START_TRIM_INPUT, "Start trim CV");
+	configInput(END_TRIM_INPUT, "End trim CV");
+	configInput(PITCH_INPUT, "Pitch CV (1 V/oct)");
+	configInput(VOLUME_INPUT, "Volume CV");
+	configInput(OVERLAP_INPUT, "Overlap CV");
+	configInput(QUANTIZE_INPUT, "Launch quantize CV");
+	configOutput(LEFT_OUTPUT, "Left");
+	configOutput(RIGHT_OUTPUT, "Right");
+	configOutput(SLICE_OUTPUT, "Slice index (1/12 V per slice)");
+	configOutput(TRIG_OUTPUT, "Slice start trigger");
+	configOutput(EOC_OUTPUT, "End of phrase");
+	for (int c = 0; c < kMaxVoices; c++) { playingSlice[c] = -1; playheads[c] = -1.f; }
+	worker.reset(new Worker);
+}
+
+Spools::~Spools() { worker.reset(); }
+
+int Spools::regionIndex(float frac, size_t n) const {
+	return n ? int(std::lround(clamp(frac, 0.f, 1.f) * float(n - 1))) : 0;
+}
+
+void Spools::publish(std::shared_ptr<const Loop> l) {
+	exchange.publish(std::move(l));
+	generation++;
+}
+
+void Spools::load(const std::string& path, std::shared_ptr<SavedLoop> saved) {
+	loading = true;
+	std::string embedded = saved ? system::join(getPatchStorageDirectory(), "loop.wav") : "";
+	worker->post([this, path, saved, embedded] {
+		std::string err;
+		std::shared_ptr<Loop> l = path.empty() ? nullptr : loadLoop(path, &err);
+		bool fromEmbed = false;
+		if ((!l || (saved && saved->crop.end > l->source->frames)) && !embedded.empty() && system::isFile(embedded)) {
+			l = loadLoop(embedded, &err);
+			fromEmbed = bool(l);
+		}
+		if (l && saved && !saved->slices.empty()) {
+			Range crop = fromEmbed ? Range{0, l->source->frames} : saved->crop;
+			std::vector<size_t> starts;
+			for (auto& s : saved->slices) starts.push_back(s.start + crop.start);
+			auto r = makeLoop(l->source, crop, saved->bpm, saved->bpmKnown, starts, l->origin, path);
+			r->meterNum = saved->meterNum;
+			r->meterDen = saved->meterDen;
+			for (size_t i = 0; i < r->slices.size() && i < saved->slices.size(); i++) r->slices[i].p = saved->slices[i].p;
+			r->regionStart = std::min(saved->regionStart, r->slices.size() - 1);
+			r->regionEnd = std::min(std::max(saved->regionEnd, r->regionStart), r->slices.size() - 1);
+			l = r;
+		}
+		if (l) {
+			if (fromEmbed) l->sourcePath = path;
+			publish(l);
+			setStatus("");
+		}
+		else setStatus(err);
+		loading = false;
+	});
+}
+
+void Spools::sliceEvenly(size_t count) {
+	auto cur = loop();
+	if (!cur) return;
+	worker->post([this, cur, count] { publish(spools::sliceEvenly(*cur, count)); });
+}
+
+void Spools::onReset(const ResetEvent& e) {
+	Module::onReset(e);
+	ppqn = 1;
+	eco = false;
+	embedAudio = true;
+}
+
+void Spools::process(const ProcessArgs& args) {
+	const Loop* l = exchange.acquire();
+	const bool clockConnected = inputs[CLOCK_INPUT].isConnected();
+	const bool edge = clockTrigger.process(inputs[CLOCK_INPUT].getVoltage(), 0.1f, 1.f);
+	float manualBpm = params[BPM_PARAM].getValue();
+	timebase.setPpqn(ppqn);
+	timebase.setFallbackBpm(manualBpm >= 1.f ? manualBpm : l ? l->bpm : 120.0);
+	timebase.process(clockConnected, edge, args.sampleTime);
+	currentBpm = float(timebase.bpm());
+
+	const int channels = std::max({1, inputs[VOCT_INPUT].getChannels(), inputs[GATE_INPUT].getChannels()});
+	for (int id : {LEFT_OUTPUT, RIGHT_OUTPUT, SLICE_OUTPUT, TRIG_OUTPUT, EOC_OUTPUT}) outputs[id].setChannels(channels);
+	activeChannels = channels;
+	if (!l) {
+		for (int id : {LEFT_OUTPUT, RIGHT_OUTPUT, SLICE_OUTPUT, TRIG_OUTPUT, EOC_OUTPUT})
+			for (int c = 0; c < channels; c++) outputs[id].setVoltage(0.f, c);
+		return;
+	}
+
+	const size_t n = l->slices.size();
+	auto cv = [&](int input, int att, int c) { return inputs[input].getPolyVoltage(c) * params[att].getValue(); };
+	PhraseParams phrase;
+	phrase.regionStart = regionIndex(params[REGION_START_PARAM].getValue(), n);
+	phrase.regionEnd = regionIndex(params[REGION_END_PARAM].getValue(), n);
+	if (params[REGION_START_PARAM].getValue() == 0.f && params[REGION_END_PARAM].getValue() == 1.f)
+		phrase.regionStart = phrase.regionEnd = -1;  // knobs untouched: use the file's own region
+	phrase.direction = Direction(int(params[DIRECTION_PARAM].getValue()));
+	phrase.loopCount = int(params[LOOP_COUNT_PARAM].getValue());
+
+	VoiceParams vp;
+	vp.tail = params[TAIL_PARAM].getValue() > 0.5f ? TailMode::Cut : TailMode::Ring;
+	vp.duration = params[DURATION_PARAM].getValue();
+	vp.quality = eco ? &SincTable::eco() : &SincTable::hq();
+
+	const double beat = timebase.phase(), period = timebase.beatPeriod();
+	for (int c = 0; c < channels; c++) {
+		float startFrac = params[START_PARAM].getValue() + cv(START_INPUT, START_ATT_PARAM, c) * 0.1f;
+		int r0, rn;
+		phrase.region(*l, r0, rn);
+		phrase.startSlice = r0 + int(std::lround(clamp(startFrac, 0.f, 1.f) * float(rn - 1)));
+		phrase.length = int(clamp(std::round(params[LENGTH_PARAM].getValue() + cv(LENGTH_INPUT, LENGTH_ATT_PARAM, c) * 6.4f), 1.f, 64.f));
+		int q = int(clamp(std::round(params[QUANTIZE_PARAM].getValue() + cv(QUANTIZE_INPUT, QUANTIZE_ATT_PARAM, c) * 0.6f), 0.f, 6.f));
+		phrase.launchQuantize = kQuantizeBeats[q];
+
+		vp.startTrim = params[START_TRIM_PARAM].getValue() + cv(START_TRIM_INPUT, START_TRIM_ATT_PARAM, c) * 0.05f;
+		vp.endTrim = params[END_TRIM_PARAM].getValue() + cv(END_TRIM_INPUT, END_TRIM_ATT_PARAM, c) * 0.05f;
+		vp.pitch = params[PITCH_PARAM].getValue() + cv(PITCH_INPUT, PITCH_ATT_PARAM, c) * 12.f;
+		float vol = std::max(0.f, params[VOLUME_PARAM].getValue() + cv(VOLUME_INPUT, VOLUME_ATT_PARAM, c) * 0.2f);
+		vp.gain = 20.f * std::log10(std::max(vol, 1e-5f));
+		vp.overlap = clamp(params[OVERLAP_PARAM].getValue() + cv(OVERLAP_INPUT, OVERLAP_ATT_PARAM, c) * 0.005f, 0.f, 0.1f);
+
+		float gateV = inputs[GATE_INPUT].getVoltage(c);
+		bool rising = gateTriggers[c].process(gateV, 0.1f, 1.f);
+		bool gate = gateTriggers[c].isHigh();
+		int semis = voltsToSemitones(inputs[VOCT_INPUT].getVoltage(c));
+
+		VoiceOut o = voices[c].process(beat, period, gate, rising, semis, *l, phrase, vp, args.sampleRate);
+		if (o.trig) trigPulses[c].trigger(1e-3f);
+		if (o.eoc) eocPulses[c].trigger(1e-3f);
+		outputs[LEFT_OUTPUT].setVoltage(5.f * o.left, c);
+		outputs[RIGHT_OUTPUT].setVoltage(5.f * o.right, c);
+		outputs[SLICE_OUTPUT].setVoltage(o.slice >= 0 ? semitonesToVolts(o.slice) : 0.f, c);
+		outputs[TRIG_OUTPUT].setVoltage(trigPulses[c].process(args.sampleTime) ? 10.f : 0.f, c);
+		outputs[EOC_OUTPUT].setVoltage(eocPulses[c].process(args.sampleTime) ? 10.f : 0.f, c);
+		playingSlice[c] = o.playing ? o.slice : -1;
+		playheads[c] = o.playing ? float(voices[c].player().position()) : -1.f;
+	}
+	for (int c = channels; c < kMaxVoices; c++) {
+		if (playheads[c] >= 0.f) { voices[c].reset(); playheads[c] = -1.f; playingSlice[c] = -1; }
+	}
+}
+
+void Spools::onSave(const SaveEvent& e) {
+	auto l = loop();
+	if (!embedAudio || !l || generation == savedGeneration) return;
+	std::string dir = createPatchStorageDirectory(), path = system::join(dir, "loop.wav");
+	if (l->audio->seconds() > kMaxEmbedSeconds) {
+		system::remove(path);
+		return;
+	}
+	LoopMeta meta;
+	meta.hasAcid = true;
+	meta.bpm = l->bpm;
+	meta.beats = uint32_t(std::lround(l->beats()));
+	meta.meterNum = uint16_t(l->meterNum);
+	meta.meterDen = uint16_t(l->meterDen);
+	for (auto& s : l->slices) meta.cues.push_back({uint32_t(s.start), ""});
+	auto bytes = writeWav(*l->audio, meta, SampleFormat::Float32);
+	if (spools::writeFile(path, bytes.data(), bytes.size())) savedGeneration = generation;
+}
+
+json_t* sliceParamsToJson(const SliceParams& p) {
+	json_t* j = json_object();
+	auto num = [&](const char* k, float v) { if (v != 0.f) json_object_set_new(j, k, json_real(v)); };
+	num("startTrim", p.startTrim);
+	num("endTrim", p.endTrim);
+	num("gain", p.gain);
+	num("pan", p.pan);
+	num("pitch", p.pitch);
+	num("cutoff", p.cutoff);
+	num("res", p.res);
+	num("xfade", p.xfade);
+	if (p.reverse) json_object_set_new(j, "reverse", json_true());
+	if (p.tail != TailMode::Inherit) json_object_set_new(j, "tail", json_integer(int(p.tail)));
+	return j;
+}
+
+void sliceParamsFromJson(json_t* j, SliceParams& p) {
+	auto num = [&](const char* k, float& v) { if (json_t* x = json_object_get(j, k)) v = float(json_number_value(x)); };
+	num("startTrim", p.startTrim);
+	num("endTrim", p.endTrim);
+	num("gain", p.gain);
+	num("pan", p.pan);
+	num("pitch", p.pitch);
+	num("cutoff", p.cutoff);
+	num("res", p.res);
+	num("xfade", p.xfade);
+	p.reverse = json_is_true(json_object_get(j, "reverse"));
+	if (json_t* t = json_object_get(j, "tail")) p.tail = TailMode(clamp(int(json_integer_value(t)), 0, int(TailMode::Stretch)));
+}
+
+json_t* Spools::dataToJson() {
+	json_t* root = json_object();
+	json_object_set_new(root, "ppqn", json_integer(ppqn));
+	json_object_set_new(root, "eco", json_boolean(eco));
+	json_object_set_new(root, "embedAudio", json_boolean(embedAudio));
+	auto l = loop();
+	if (!l) return root;
+	json_t* j = json_object();
+	json_object_set_new(j, "path", json_string(l->sourcePath.c_str()));
+	json_object_set_new(j, "cropStart", json_integer(json_int_t(l->crop.start)));
+	json_object_set_new(j, "cropEnd", json_integer(json_int_t(l->crop.end)));
+	json_object_set_new(j, "bpm", json_real(l->bpm));
+	json_object_set_new(j, "bpmKnown", json_boolean(l->bpmKnown));
+	json_object_set_new(j, "meterNum", json_integer(l->meterNum));
+	json_object_set_new(j, "meterDen", json_integer(l->meterDen));
+	json_object_set_new(j, "regionStart", json_integer(json_int_t(l->regionStart)));
+	json_object_set_new(j, "regionEnd", json_integer(json_int_t(l->regionEnd)));
+	json_t* slices = json_array();
+	for (auto& s : l->slices) {
+		json_t* js = sliceParamsToJson(s.p);
+		json_object_set_new(js, "start", json_integer(json_int_t(s.start)));
+		json_array_append_new(slices, js);
+	}
+	json_object_set_new(j, "slices", slices);
+	json_object_set_new(root, "loop", j);
+	return root;
+}
+
+void Spools::dataFromJson(json_t* root) {
+	if (json_t* x = json_object_get(root, "ppqn")) ppqn = clamp(int(json_integer_value(x)), 1, 96);
+	if (json_t* x = json_object_get(root, "eco")) eco = json_is_true(x);
+	if (json_t* x = json_object_get(root, "embedAudio")) embedAudio = json_is_true(x);
+	json_t* j = json_object_get(root, "loop");
+	if (!j) return;
+	auto saved = std::make_shared<SavedLoop>();
+	auto integer = [&](const char* k, size_t def) { json_t* x = json_object_get(j, k); return x ? size_t(std::max<json_int_t>(0, json_integer_value(x))) : def; };
+	saved->crop = {integer("cropStart", 0), integer("cropEnd", 0)};
+	saved->bpm = json_number_value(json_object_get(j, "bpm"));
+	saved->bpmKnown = json_is_true(json_object_get(j, "bpmKnown"));
+	saved->meterNum = int(integer("meterNum", 4));
+	saved->meterDen = int(integer("meterDen", 4));
+	saved->regionStart = integer("regionStart", 0);
+	saved->regionEnd = integer("regionEnd", 0);
+	json_t* slices = json_object_get(j, "slices");
+	size_t i;
+	json_t* js;
+	json_array_foreach(slices, i, js) {
+		Slice s;
+		s.start = size_t(std::max<json_int_t>(0, json_integer_value(json_object_get(js, "start"))));
+		sliceParamsFromJson(js, s.p);
+		saved->slices.push_back(s);
+	}
+	json_t* path = json_object_get(j, "path");
+	load(path ? json_string_value(path) : "", saved);
+	savedGeneration = generation + 1;  // the embedded file on disk already matches what we are loading
+}

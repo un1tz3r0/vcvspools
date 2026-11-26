@@ -5,7 +5,8 @@
 namespace spools {
 
 int NoteSequencer::sliceAt(int k, const Loop& loop, const PhraseParams& p) {
-	int r0 = int(loop.regionStart), n = int(loop.regionEnd) - r0 + 1, len = std::max(1, p.length);
+	int r0, n, len = std::max(1, p.length);
+	p.region(loop, r0, n);
 	int off;
 	switch (p.direction) {
 		case Direction::Reverse: off = -k; break;
@@ -46,7 +47,8 @@ SeqEvent NoteSequencer::process(double beat, bool gate, bool rising, int semis, 
 
 	if (pending && beat >= pendingAt - 1e-12) {
 		pending = false;
-		int r0 = int(loop.regionStart), n = int(loop.regionEnd) - r0 + 1;
+		int r0, n;
+		p.region(loop, r0, n);
 		int start = std::clamp(p.startSlice, r0, r0 + n - 1) - r0;
 		first = wrap(start + pendingSemis, n);
 		step = pass = 0;

@@ -2,6 +2,15 @@
 
 Versions follow `TODO.md`: each `2.N.p` heading is one task, and the last one in a milestone is the released version.
 
+## 2.2.5
+
+- First playable module. It loads a file from the context menu on a background thread and plays 16 poly voices from V/OCT and GATE, locked to CLOCK (1–96 PPQN, menu) or the manual/loop BPM.
+- Controls: start slice, length, start/end trims, pitch, volume, overlap, duration, launch quantize, manual BPM, region start/end, loop count, direction and tail (Ring/Cut). CV inputs with attenuverters for start, length, trims, pitch, volume, overlap and quantize.
+- Outputs: L, R, SLICE (1/12 V per slice), TRIG and EOC, all polyphonic.
+- The patch saves the slice map with per-slice params. The cropped audio is embedded in patch storage as an Acidized WAV (up to 5 minutes; menu toggle), and is used when the original file is missing.
+- Menu: *Slice evenly* (until analysis lands), eco interpolation.
+- A clearer error for REX1 `.rex`/`.rcy` files.
+
 ## 2.2.4
 
 - `Voice`: a phrase sequencer driving two slice players. The outgoing slice fades out with a raised cosine over the overlap time while the incoming slice keeps its attack.

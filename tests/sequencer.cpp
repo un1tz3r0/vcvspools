@@ -68,6 +68,9 @@ TEST_CASE("semitone offsets wrap around the region, both ways") {
 	narrowed->regionEnd = 4;
 	p.startSlice = 0;  // clamps to the region start
 	CHECK(slices(play(s, *narrowed, p, 0, 0.1, 4, 4)) == std::vector<int>{3, 4});
+	p.regionStart = 5;  // explicit region overrides the loop's, reversed bounds are swapped
+	p.regionEnd = 3;
+	CHECK(slices(play(s, *narrowed, p, 0, 0.1, 4, 2)) == std::vector<int>{5, 3});
 }
 
 TEST_CASE("held gate repeats the phrase up to loop count; release finishes the slice") {

@@ -1,4 +1,5 @@
 #pragma once
+#include <algorithm>
 #include <cmath>
 #include <cstdint>
 #include "loop.hpp"
@@ -13,6 +14,16 @@ struct PhraseParams {
 	Direction direction = Direction::Forward;
 	int loopCount = 0;      // passes while the gate is held; 0 = forever
 	double launchQuantize = 0;  // beats; 0 = immediate
+	int regionStart = -1, regionEnd = -1;  // slice indices, inclusive; -1 = the loop's own region
+
+	void region(const Loop& loop, int& r0, int& n) const {
+		int last = int(loop.slices.size()) - 1;
+		int a = regionStart >= 0 ? std::min(regionStart, last) : int(loop.regionStart);
+		int b = regionEnd >= 0 ? std::min(regionEnd, last) : int(loop.regionEnd);
+		if (b < a) std::swap(a, b);
+		r0 = a;
+		n = b - a + 1;
+	}
 };
 
 // What a voice should do on this sample.

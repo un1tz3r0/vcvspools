@@ -96,7 +96,11 @@ std::shared_ptr<Loop> loadLoop(const uint8_t* data, size_t size, const std::stri
 	Format fmt = sniffFormat(data, size, path);
 	if (fmt == Format::Rex) {
 		RexFile rex;
-		if (!readRex(data, size, rex, error)) return nullptr;
+		if (!readRex(data, size, rex, error)) {
+			std::string ext = fileExtension(path);
+			if (error && (ext == "rex" || ext == "rcy")) *error = "REX1 (.rex/.rcy) files are not supported yet; save as .rx2";
+			return nullptr;
+		}
 		std::vector<size_t> starts;
 		for (auto& s : rex.slices) starts.push_back(s.start);
 		auto loop = makeLoop(rex.audio, {rex.loopStart(), rex.loopEnd()}, rex.nativeBpm, true, starts, Origin::Rex, path);

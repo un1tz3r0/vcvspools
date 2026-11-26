@@ -1,20 +1,8 @@
-#include <rack.hpp>
+#include "plugin.hpp"
 
-using namespace rack;
+Plugin* pluginInstance;
 
-struct Spools : Module {
-	Spools() {
-		config(0, 0, 0, 0);
-	}
-};
-
-struct SpoolsWidget : ModuleWidget {
-	SpoolsWidget(Spools* module) {
-		setModule(module);
-		box.size = Vec(12 * RACK_GRID_WIDTH, RACK_GRID_HEIGHT);
-	}
-};
-
-void init(Plugin* plugin) {
-	plugin->addModel(createModel<Spools, SpoolsWidget>("Spools"));
+void init(Plugin* p) {
+	pluginInstance = p;
+	p->addModel(modelSpools);
 }
