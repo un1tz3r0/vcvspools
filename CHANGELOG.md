@@ -2,6 +2,11 @@
 
 Versions follow `TODO.md`: each `2.N.p` heading is one task, and the last one in a milestone is the released version.
 
+## 2.2.6
+
+- 36 HP panel with light and dark themes. Labels are drawn with NanoVG at 12 px (≈3 mm caps) so they stay legible at 100% zoom.
+- Display drawn on the light layer, so it stays lit with the room lights dimmed. It shows the file name, live BPM, slice count, length and an "unofficial REX" tag, a waveform coloured per slice, slice numbers, region shading, and one playhead per voice with its slice highlighted. It also shows the load status and errors.
+
 ## 2.2.5
 
 - First playable module. It loads a file from the context menu on a background thread and plays 16 poly voices from V/OCT and GATE, locked to CLOCK (1–96 PPQN, menu) or the manual/loop BPM.

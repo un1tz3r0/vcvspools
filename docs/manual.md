@@ -9,6 +9,13 @@ Spools is an early proof of concept. See `DESIGN.md` for the planned behaviour a
 3. Patch a gate or trigger into **GATE**. C4 (0 V) on **V/OCT** plays the start slice, and each semitone up or down plays the next or previous slice.
 4. Patch a clock into **CLOCK** and set its resolution in the menu. Without one, Spools uses the **BPM** knob, or the loop's own tempo when the knob is at 0.
 
+## Panel
+
+- **Display**: the loop, coloured by slice, with a playhead per voice. The header shows the file, the current BPM (a `?` means it was guessed), the slice count and the length.
+- **Top row**: SLICE (start slice), LENGTH, trim IN/OUT, PITCH, LEVEL, XFADE (overlap), DUR (gate length in Cut mode), QUANT (launch quantize), BPM. Each knob with a CV jack has a small CV-amount knob above the jack.
+- **RING/CUT** switch and **DIR** (direction) knob.
+- **Bottom**: V/OCT, GATE, CLOCK inputs; region FROM/TO and LOOPS; outputs L, R, SLICE, TRIG, EOC.
+
 ## Playing slices
 
 - Each trigger plays **LENGTH** slices. Each slice starts on its own beat position, scaled to the current tempo. Pitch is independent of tempo.
