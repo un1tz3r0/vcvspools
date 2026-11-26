@@ -29,6 +29,42 @@ struct PanelLabels : widget::TransparentWidget {
 	}
 };
 
+// A knob that can edit the selected slices: Shift-click first sets them all to their mean, and a ring
+// shows the spread of the selection's values.
+template <class TBase>
+struct SliceKnob : TBase {
+	void onButton(const widget::Widget::ButtonEvent& e) override {
+		auto* m = dynamic_cast<Spools*>(this->module);
+		if (m && e.action == GLFW_PRESS && e.button == GLFW_MOUSE_BUTTON_LEFT && (e.mods & RACK_MOD_MASK) == GLFW_MOD_SHIFT)
+			m->flattenSelection(this->paramId);
+		TBase::onButton(e);
+	}
+	void drawLayer(const widget::Widget::DrawArgs& args, int layer) override {
+		TBase::drawLayer(args, layer);
+		auto* m = dynamic_cast<Spools*>(this->module);
+		float lo, hi;
+		if (layer != 1 || !m || !m->selectionSpread(this->paramId, lo, hi)) return;
+		ParamQuantity* q = this->getParamQuantity();
+		auto angle = [&](float v) {
+			float t = (v - q->getMinValue()) / (q->getMaxValue() - q->getMinValue());
+			return float(this->minAngle + t * (this->maxAngle - this->minAngle) - M_PI / 2);
+		};
+		const Vec c = this->box.size.div(2);
+		nvgBeginPath(args.vg);
+		nvgArc(args.vg, c.x, c.y, c.x + 2.5f, angle(lo), std::max(angle(hi), angle(lo) + 0.08f), NVG_CW);
+		nvgStrokeColor(args.vg, nvgRGB(0xff, 0xc8, 0x57));
+		nvgStrokeWidth(args.vg, 2.5f);
+		nvgStroke(args.vg);
+	}
+};
+
+bool editsSlices(int id) {
+	for (int p : {Spools::START_TRIM_PARAM, Spools::END_TRIM_PARAM, Spools::PITCH_PARAM, Spools::VOLUME_PARAM,
+		Spools::OVERLAP_PARAM, Spools::CUTOFF_PARAM, Spools::RES_PARAM})
+		if (p == id) return true;
+	return false;
+}
+
 void chooseFile(Spools* module) {
 	auto l = module->loop();
 	std::string dir = l && !l->sourcePath.empty() ? system::getDirectory(l->sourcePath) : "";
@@ -145,7 +181,8 @@ struct SpoolsWidget : ModuleWidget {
 			{S::BPM_PARAM, -1, -1, "BPM"},
 		};
 		for (int i = 0; i < 10; i++) {
-			addParam(createParamCentered<RoundBlackKnob>(Vec(col(i), kRow1), module, cols[i].param));
+			if (editsSlices(cols[i].param)) addParam(createParamCentered<SliceKnob<RoundBlackKnob>>(Vec(col(i), kRow1), module, cols[i].param));
+			else addParam(createParamCentered<RoundBlackKnob>(Vec(col(i), kRow1), module, cols[i].param));
 			labels->labels.push_back({col(i), kRow1 - 24, cols[i].label});
 			if (cols[i].att >= 0) {
 				addParam(createParamCentered<Trimpot>(Vec(col(i), kAttY), module, cols[i].att));
@@ -166,7 +203,12 @@ struct SpoolsWidget : ModuleWidget {
 			labels->labels.push_back({(x0 + x - kStripStep) / 2, kStripLabelY, label});
 			x += kStripGap;
 		};
-		auto knob = [&](int id) { return [=](Vec p) { addParam(createParamCentered<RoundSmallBlackKnob>(p, module, id)); }; };
+		auto knob = [&](int id) {
+			return [=](Vec p) {
+				if (editsSlices(id)) addParam(createParamCentered<SliceKnob<RoundSmallBlackKnob>>(p, module, id));
+				else addParam(createParamCentered<RoundSmallBlackKnob>(p, module, id));
+			};
+		};
 		auto trim = [&](int id) { return [=](Vec p) { addParam(createParamCentered<Trimpot>(p, module, id)); }; };
 		auto jack = [&](int id) { return [=](Vec p) { addInput(createInputCentered<ThemedPJ301MPort>(p, module, id)); }; };
 		group("FILTER", {knob(S::FILTER_TYPE_PARAM)});
@@ -197,6 +239,11 @@ struct SpoolsWidget : ModuleWidget {
 			labels->labels.push_back({x, kBottomY - 18, outLabels[i]});
 		}
 		addChild(labels);
+	}
+
+	void step() override {
+		if (auto* m = getModule<Spools>()) m->syncSelectionKnobs();
+		ModuleWidget::step();
 	}
 
 	void appendContextMenu(Menu* menu) override {

@@ -209,6 +209,8 @@ void Spools::onReset(const ResetEvent& e) {
 	playMode = kNoteMode;
 	slicing = {};
 	cropUnit = CropSpec::Seconds;
+	selection.clear();
+	knobsOnSelection = false;
 }
 
 void Spools::process(const ProcessArgs& args) {
@@ -285,14 +287,14 @@ void Spools::process(const ProcessArgs& args) {
 		int q = int(clamp(std::round(params[QUANTIZE_PARAM].getValue() + cv(QUANTIZE_INPUT, QUANTIZE_ATT_PARAM, c) * 0.6f), 0.f, 6.f));
 		phrase.launchQuantize = kQuantizeBeats[q];
 
-		vp.startTrim = params[START_TRIM_PARAM].getValue() + cv(START_TRIM_INPUT, START_TRIM_ATT_PARAM, c) * 0.05f;
-		vp.endTrim = params[END_TRIM_PARAM].getValue() + cv(END_TRIM_INPUT, END_TRIM_ATT_PARAM, c) * 0.05f;
-		vp.pitch = params[PITCH_PARAM].getValue() + cv(PITCH_INPUT, PITCH_ATT_PARAM, c) * 12.f;
-		float vol = std::max(0.f, params[VOLUME_PARAM].getValue() + cv(VOLUME_INPUT, VOLUME_ATT_PARAM, c) * 0.2f);
+		vp.startTrim = knob(START_TRIM_PARAM) + cv(START_TRIM_INPUT, START_TRIM_ATT_PARAM, c) * 0.05f;
+		vp.endTrim = knob(END_TRIM_PARAM) + cv(END_TRIM_INPUT, END_TRIM_ATT_PARAM, c) * 0.05f;
+		vp.pitch = knob(PITCH_PARAM) + cv(PITCH_INPUT, PITCH_ATT_PARAM, c) * 12.f;
+		float vol = std::max(0.f, knob(VOLUME_PARAM) + cv(VOLUME_INPUT, VOLUME_ATT_PARAM, c) * 0.2f);
 		vp.gain = 20.f * std::log10(std::max(vol, 1e-5f));
-		vp.cutoff = params[CUTOFF_PARAM].getValue() + cv(CUTOFF_INPUT, CUTOFF_ATT_PARAM, c);
-		vp.res = clamp(params[RES_PARAM].getValue() + cv(RES_INPUT, RES_ATT_PARAM, c) * 0.1f, 0.f, 1.f);
-		vp.overlap = clamp(params[OVERLAP_PARAM].getValue() + cv(OVERLAP_INPUT, OVERLAP_ATT_PARAM, c) * 0.005f, 0.f, 0.1f);
+		vp.cutoff = knob(CUTOFF_PARAM) + cv(CUTOFF_INPUT, CUTOFF_ATT_PARAM, c);
+		vp.res = clamp(knob(RES_PARAM) + cv(RES_INPUT, RES_ATT_PARAM, c) * 0.1f, 0.f, 1.f);
+		vp.overlap = clamp(knob(OVERLAP_PARAM) + cv(OVERLAP_INPUT, OVERLAP_ATT_PARAM, c) * 0.005f, 0.f, 0.1f);
 
 		float gateV = inputs[GATE_INPUT].getVoltage(c);
 		bool rising = gateTriggers[c].process(gateV, 0.1f, 1.f);

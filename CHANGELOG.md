@@ -2,6 +2,12 @@
 
 Versions follow `TODO.md`: each `2.N.p` heading is one task, and the last one in a milestone is the released version.
 
+## 2.6.5
+
+- Selection editing: while slices are selected, IN, OUT, PITCH, LEVEL, XFADE, CUTOFF and RES show the selection's mean and edit its slices. Turning a knob moves every selected slice by the same amount, in the slice's own units (seconds, semitones, dB, octaves). Shift-click sets the selection to its mean, as one undo step. An amber ring shows the selection's spread.
+- The global knob values are set aside while editing. The audio thread and the saved patch both use them, and they come back when the selection is cleared.
+- The LOOP header shows how many slices are selected.
+
 ## 2.6.4
 
 - Mouse editing on the LOOP page: select, deselect and multi-select slices; drag boundaries with grid snap (Alt for free); double-click to add a slice and Ctrl-double-click to delete one; drag per-slice trim handles; drag region handles, which set FROM/TO; scroll-wheel zoom around the pointer; middle-drag to scroll, with a position bar.

@@ -79,6 +79,18 @@ struct Spools : Module {
 	const spools::Loop* selectionOf = nullptr;
 	// The selection, emptied when the slice list it refers to has changed shape.
 	std::vector<size_t>& selected();
+	// Selection editing (DESIGN §8): while slices are selected, the per-slice knobs show and edit the selection,
+	// and the audio thread reads the global values set aside in `globalStash`.
+	std::atomic<bool> knobsOnSelection{false};
+	std::atomic<float> globalStash[PARAMS_LEN];
+	float knob(int id) { return knobsOnSelection ? globalStash[id].load(std::memory_order_relaxed) : params[id].getValue(); }
+	void syncSelectionKnobs();                  // UI thread, every frame
+	void flattenSelection(int paramId);         // sets every selected slice to the selection's mean
+	bool selectionSpread(int paramId, float& lo, float& hi);  // knob values of the lowest and highest selected slice
+	json_t* paramsToJson() override;
+	std::vector<size_t> shownFor;
+	const spools::Loop* shownLoop = nullptr;
+	float shown[PARAMS_LEN] = {};
 	// Publishes an edited loop and records it for undo; `before` is what undo goes back to.
 	void commitEdit(std::shared_ptr<const spools::Loop> before, std::shared_ptr<const spools::Loop> after, const std::string& name);    // automatic CONT every N bars; 0 = never
 	spools::SliceSettings slicing;  // UI thread only; workers get a copy

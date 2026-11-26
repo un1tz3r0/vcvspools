@@ -29,6 +29,10 @@ Spools is an early proof of concept. See `DESIGN.md` for the planned behaviour a
 - **Zoom and scroll**: the scroll wheel zooms around the pointer, and dragging with the middle button scrolls. A bar along the bottom shows where you are.
 - Every edit can be undone with Rack's Undo.
 
+### Editing selected slices with the knobs
+
+While slices are selected, IN, OUT, PITCH, LEVEL, XFADE, CUTOFF and RES edit those slices instead of the whole module. Each knob jumps to the selection's average, and an amber ring shows the range from the lowest to the highest selected slice. Turning a knob moves every selected slice by the same amount, so their differences are kept. Shift-click a knob to set all selected slices to their average first. When you clear the selection, the knobs go back to their global settings. CV always modulates the global settings, and the patch always saves the global values.
+
 ## Playing slices
 
 - Each trigger plays **LENGTH** slices. Each slice starts on its own beat position, scaled to the current tempo. Pitch is independent of tempo.

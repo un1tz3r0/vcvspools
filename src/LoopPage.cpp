@@ -253,7 +253,8 @@ struct LoopPage : Page {
 		std::string bpm = string::f("%.1f%s", module->currentBpm.load(), loop->bpmKnown ? "" : "?");
 		ctx.text(right, hy, NVG_ALIGN_RIGHT | NVG_ALIGN_BASELINE, 16, kText, bpm);
 		right -= nvgTextBounds(vg, 0, 0, bpm.c_str(), nullptr, nullptr) + 4;
-		std::string info = string::f("%zu slice%s  %.2f s   BPM", n, n == 1 ? "" : "s", a.seconds());
+		const size_t nsel = module->selected().size();
+		std::string info = nsel ? string::f("%zu of %zu selected   BPM", nsel, n) : string::f("%zu slice%s  %.2f s   BPM", n, n == 1 ? "" : "s", a.seconds());
 		nvgFontSize(vg, kReadout);
 		ctx.text(right, hy, NVG_ALIGN_RIGHT | NVG_ALIGN_BASELINE, kReadout, kDim, info);
 		right -= nvgTextBounds(vg, 0, 0, info.c_str(), nullptr, nullptr) + 8;
