@@ -6,6 +6,7 @@
 #include <string>
 #include "plugin.hpp"
 #include "core/exchange.hpp"
+#include "core/pattern.hpp"
 #include "core/length.hpp"
 #include "core/loop.hpp"
 #include "core/slicing.hpp"
@@ -73,10 +74,16 @@ struct Spools : Module {
 	std::atomic<bool> retriggerPerNote{false};
 	std::atomic<float> loopXfade{0.01f};  // seconds
 	std::atomic<float> transientPreserve{1}, stretchTail{1};  // Stretch tail, 0..1
-	static constexpr int kNoteMode = 0, kLoopMode = 1;
+	static constexpr int kNoteMode = 0, kLoopMode = 1, kPatternMode = 2;
 	std::atomic<int> playMode{kNoteMode};
-	bool wasLoopMode = false;  // audio thread
+	int wasMode = kNoteMode;  // audio thread
 	spools::LoopSequencer loopSeqs[kMaxVoices];
+	spools::PatternSequencer patternSeqs[kMaxVoices];
+	// Pattern mode's slice remap, published to the audio thread like the loop.
+	spools::Exchange<spools::Pattern> patterns;
+	std::shared_ptr<const spools::Audio> patternSource;  // the file the pattern was made for (UI thread)
+	std::shared_ptr<const spools::Pattern> pattern() { return patterns.latest(); }
+	void ensurePattern();  // UI thread: makes one from the loop when there is none, or the file changed
 	std::atomic<float> barBeats{0};      // 0 = from the loop's meter
 	std::atomic<int> barsPerCycle{0};
 	// Display state (UI thread).

@@ -2,6 +2,18 @@
 
 Versions follow `TODO.md`: each `2.N.p` heading is one task, and the last one in a milestone is the released version.
 
+## 2.9.1
+
+- **Pattern mode** (SETTINGS → Mode → Pattern), the third play mode, runs on the loop-mode transport. A pattern (`core/pattern.hpp`) has steps, each with:
+  - a slice or a rest;
+  - a length in 1/32-note ticks and a ± nudge;
+  - a gate length, reverse and a pitch offset.
+
+  Each pattern also has a loop range, a loop count and a direction.
+- `PatternSequencer` sets its position from the transport's loop beat, like loop mode. V/OCT shifts every step's slice. Reverse and ping-pong passes play the steps, and their lengths, backwards. Random picks each slot's step. Rests release the voice.
+- A step's gate length, pitch and reverse are added to the slice's own settings, and the pitch keeps following knob changes.
+- A pattern is made from the loop, one step per slice, whenever a new file loads. The editor and saving come in 2.9.3.
+
 ## 2.8.2
 
 - Manual:

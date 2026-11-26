@@ -71,6 +71,7 @@ private:
 	// Cached control-rate work: the glide coefficient, the last pitch sent and the last filter setting.
 	float glideRate = 0, glideCoef = 0, lastPitch = 0;
 	struct { FilterType type = FilterType::Off; float cutoff = -99, res = -1, rate = 0; } filterSet;
+	float eventPitch = 0;  // the playing pattern step's pitch offset
 	int quiet = 0;  // samples of silence with no player active
 	static constexpr int kQuietAfter = 4800;  // the filter's tail at the highest resonance is shorter
 	const Loop* loop = nullptr;
@@ -81,7 +82,7 @@ private:
 	static constexpr float kGlide = 0.005f;
 	void updateTargets(const Loop& l, const VoiceParams& vp);
 
-	void begin(int slice, bool phraseStart, double slotSeconds, const Loop& l, const VoiceParams& vp, float engineRate);
+	void begin(const SeqEvent& e, double slotSeconds, const Loop& l, const VoiceParams& vp, float engineRate);
 	void noteOff(const VoiceParams& vp);
 };
 

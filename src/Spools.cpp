@@ -275,13 +275,15 @@ void Spools::process(const ProcessArgs& args) {
 		transportState = transport.process(timebase.phase(), in, bar, barsPerCycle);
 	}
 
-	const bool loopMode = playMode == kLoopMode;
-	if (loopMode != wasLoopMode) {  // switching modes: silence everything and start clean
-		for (int c = 0; c < kMaxVoices; c++) { voices[c].reset(); loopSeqs[c].reset(); }
-		wasLoopMode = loopMode;
+	const int mode = playMode;
+	const bool transported = mode != kNoteMode;
+	const Pattern* pat = patterns.acquire();
+	if (mode != wasMode) {  // switching modes: silence everything and start clean
+		for (int c = 0; c < kMaxVoices; c++) { voices[c].reset(); loopSeqs[c].reset(); patternSeqs[c].reset(); }
+		wasMode = mode;
 	}
-	// Loop mode: one transport voice per V/oct channel (each with its own offset); GATE is ignored.
-	const int channels = loopMode ? std::max(1, inputs[VOCT_INPUT].getChannels())
+	// Loop and pattern modes: one transport voice per V/oct channel (each with its own offset); GATE is ignored.
+	const int channels = transported ? std::max(1, inputs[VOCT_INPUT].getChannels())
 		: std::max({1, inputs[VOCT_INPUT].getChannels(), inputs[GATE_INPUT].getChannels()});
 	for (int id = 0; id < OUTPUTS_LEN; id++) outputs[id].setChannels(channels);
 	activeChannels = channels;
@@ -343,8 +345,9 @@ void Spools::process(const ProcessArgs& args) {
 		bool gate = gateTriggers[c].isHigh();
 		int semis = voltsToSemitones(inputs[VOCT_INPUT].getVoltage(c));
 
-		VoiceOut o = loopMode
-			? voices[c].play(loopSeqs[c].process(transportState.loopBeat, transportState.running, transportState.reset, semis, *l, phrase),
+		const auto& ts = transportState;
+		VoiceOut o = mode == kLoopMode ? voices[c].play(loopSeqs[c].process(ts.loopBeat, ts.running, ts.reset, semis, *l, phrase), period, *l, vp, args.sampleRate)
+			: mode == kPatternMode ? voices[c].play(pat ? patternSeqs[c].process(ts.loopBeat, ts.running, ts.reset, semis, *l, *pat) : SeqEvent(),
 				period, *l, vp, args.sampleRate)
 			: voices[c].process(beat, period, gate, rising, semis, *l, phrase, vp, args.sampleRate);
 		if (o.trig) trigPulses[c].trigger(1e-3f);
@@ -362,7 +365,15 @@ void Spools::process(const ProcessArgs& args) {
 	for (int c = channels; c < kMaxVoices; c++) {
 		if (playheads[c] >= 0.f) { voices[c].reset(); playheads[c] = -1.f; playingSlice[c] = -1; }
 		loopSeqs[c].reset();
+		patternSeqs[c].reset();
 	}
+}
+
+void Spools::ensurePattern() {
+	auto l = loop();
+	if (!l || l->slices.empty() || (pattern() && patternSource == l->source)) return;
+	patternSource = l->source;
+	patterns.publish(std::make_shared<const Pattern>(initFromLoop(*l)));
 }
 
 void Spools::onSave(const SaveEvent& e) {
@@ -477,7 +488,7 @@ void Spools::dataFromJson(json_t* root) {
 	if (json_t* x = json_object_get(root, "displayPage")) displayPage = int(json_integer_value(x));
 	if (json_t* x = json_object_get(root, "viewSpan")) viewSpan = clamp(float(json_number_value(x)), 0.001f, 1.f);
 	if (json_t* x = json_object_get(root, "viewStart")) viewStart = clamp(float(json_number_value(x)), 0.f, 1.f - viewSpan);
-	if (json_t* x = json_object_get(root, "mode")) playMode = clamp(int(json_integer_value(x)), 0, 1);
+	if (json_t* x = json_object_get(root, "mode")) playMode = clamp(int(json_integer_value(x)), 0, int(kPatternMode));
 	if (json_t* x = json_object_get(root, "barsPerCycle")) barsPerCycle = clamp(int(json_integer_value(x)), 0, 64);
 	if (json_t* js = json_object_get(root, "slicing")) {
 		slicing.mode = SliceMode(clamp(int(json_integer_value(json_object_get(js, "mode"))), 0, 2));

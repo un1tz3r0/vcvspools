@@ -61,9 +61,14 @@ SlicePlayer::StretchPlan stretchPlan(const Loop& l, size_t i, const SlicePlayer:
 	return p;
 }
 
-void Voice::begin(int slice, bool phraseStart, double slotSeconds, const Loop& l, const VoiceParams& vp, float engineRate) {
+void Voice::begin(const SeqEvent& e, double slotSeconds, const Loop& l, const VoiceParams& vp, float engineRate) {
+	const int slice = e.slice;
+	const bool phraseStart = e.phraseStart;
 	const Slice& s = l.slices[size_t(slice)];
-	const Resolved r = resolve(vp, s.p);
+	Resolved r = resolve(vp, s.p);
+	eventPitch = e.pitch;
+	r.pitch = std::clamp(r.pitch + e.pitch, -48.f, 48.f);
+	r.reverse = r.reverse != e.reverse;
 	players[cur].stop(r.fade);
 	const int prev = cur;
 	cur ^= 1;
@@ -80,7 +85,7 @@ void Voice::begin(int slice, bool phraseStart, double slotSeconds, const Loop& l
 	rateBase = l.audio->sampleRate / engineRate;
 	players[cur].setQuality(vp.quality);
 	players[cur].start(l.audio.get(), span, rateBase * semitonesToRatio(r.pitch), engineRate);
-	const double gate = slotSeconds * std::clamp(vp.duration, 0.05f, 1.f);
+	const double gate = slotSeconds * std::clamp(vp.duration * e.duration, 0.05f, 1.f);
 	lastPitch = r.pitch;
 	quiet = 0;
 	if (r.tail == TailMode::Loop || r.tail == TailMode::AutoLoop) players[cur].setLoop(loopPoints(l, size_t(slice), span, vp, r.tail));
@@ -116,7 +121,7 @@ VoiceOut Voice::play(const SeqEvent& e, double beatPeriod, const Loop& l, const 
 	loop = &l;
 
 	if (e.slice >= 0) {
-		begin(e.slice, e.phraseStart, e.sliceBeats * beatPeriod, l, vp, engineRate);
+		begin(e, e.sliceBeats * beatPeriod, l, vp, engineRate);
 		out.trig = true;
 	}
 	if (e.release && !released) {
@@ -191,7 +196,7 @@ void Voice::updateTargets(const Loop& l, const VoiceParams& vp) {
 	const SliceParams none;
 	const SliceParams& sp = lastSlice >= 0 && size_t(lastSlice) < l.slices.size() ? l.slices[size_t(lastSlice)].p : none;
 	const Resolved r = resolve(vp, sp);
-	pitch.target = r.pitch;
+	pitch.target = std::clamp(r.pitch + eventPitch, -48.f, 48.f);
 	cutoff.target = r.cutoff;
 	res.target = r.res;
 }

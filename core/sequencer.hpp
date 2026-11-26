@@ -33,6 +33,10 @@ struct SeqEvent {
 	bool phraseStart = false; // first slice of a newly triggered phrase
 	bool endOfPhrase = false; // a pass just completed (EOC)
 	bool release = false;     // the phrase is over: let the voice release
+	// Pattern steps add their own settings to the slice's.
+	float duration = 1;       // multiplies the gate length
+	float pitch = 0;          // semitones
+	bool reverse = false;     // flips the slice's direction
 };
 
 // Note-mode phrase sequencer for one voice (DESIGN §6.2). All timing is in beats from TimeBase,

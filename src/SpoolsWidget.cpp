@@ -245,6 +245,7 @@ struct SpoolsWidget : ModuleWidget {
 		if (auto* m = getModule<Spools>()) {
 			m->flushHistory();
 			m->ensureFeatures();
+			m->ensurePattern();
 			m->syncSelectionKnobs();
 		}
 		ModuleWidget::step();

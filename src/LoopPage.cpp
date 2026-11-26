@@ -379,7 +379,8 @@ struct LoopPage : Page {
 		ctx.text(right, hy, NVG_ALIGN_RIGHT | NVG_ALIGN_BASELINE, kReadout, kDim, info);
 		right -= nvgTextBounds(vg, 0, 0, info.c_str(), nullptr, nullptr) + 8;
 		if (loop->origin == Origin::Rex) right = badge(ctx, right, hy, "REX unofficial", kAccent) - 6;
-		if (module->playMode == Spools::kLoopMode) right = badge(ctx, right, hy, "LOOP MODE", kText) - 6;
+		if (module->playMode != Spools::kNoteMode)
+			right = badge(ctx, right, hy, module->playMode == Spools::kLoopMode ? "LOOP MODE" : "PATTERN MODE", kText) - 6;
 		nvgSave(vg);
 		nvgScissor(vg, ax, ay, right - ax - 4, kHeader);
 		ctx.text(ax + kPad, hy, NVG_ALIGN_LEFT | NVG_ALIGN_BASELINE, kReadout, kText, name);
