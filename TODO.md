@@ -19,7 +19,7 @@ Each top-level item is a minor version (`2.N.0`) and one PR to `main`. Each seco
 
 - [ ] **2.3 Analysis and slicing**
   - [x] 2.3.1 STFT + spectral-flux onset envelope (in-house FFT)
-  - [ ] 2.3.2 Onset picking: adaptive threshold, sensitivity, minimum gap, zero-crossing refinement
+  - [x] 2.3.2 Onset picking: adaptive threshold, sensitivity, minimum gap, zero-crossing refinement
   - [ ] 2.3.3 Tempo estimation (autocorrelation + prior + comb), bar-fit nudge, grid phase; halve/double/tap
   - [ ] 2.3.4 Slicing modes (onsets/grid/hybrid) with grid-snap strength; re-slice on the worker when settings change
   - [ ] 2.3.5 Context-menu crop and BPM text fields

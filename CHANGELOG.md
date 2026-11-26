@@ -2,6 +2,10 @@
 
 Versions follow `TODO.md`: each `2.N.p` heading is one task, and the last one in a milestone is the released version.
 
+## 2.3.2
+
+- Onset picking: local maxima of the envelope above a 0.2 s running median plus a sensitivity-controlled delta, with a minimum gap that merges flams. Each onset is refined in the waveform to where the hit starts rising, within about 2 ms in tests, then moved back to the preceding zero crossing.
+
 ## 2.3.1
 
 - Onset envelope: Hann STFT (1024/256) of the mono mix, log-compressed magnitudes, half-wave rectified spectral flux, and a ~0.1 s moving-average high-pass.

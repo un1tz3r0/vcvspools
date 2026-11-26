@@ -64,3 +64,41 @@ TEST_CASE("silence and steady tones have no onsets after the start") {
 	float later = *std::max_element(env.flux.begin() + 20, env.flux.end() - 8);
 	CHECK(later < 0.05f * early);
 }
+
+TEST_CASE("onset picking finds each hit within 2 ms, at a zero crossing") {
+	std::vector<double> at = {0.05, 0.3, 0.55, 0.8, 1.05, 1.3, 1.55};
+	Audio a = hits(at, 1.8);
+	auto env = onsetEnvelope(a);
+	auto on = pickOnsets(env, a);
+	REQUIRE(on.size() == at.size());
+	for (size_t i = 0; i < at.size(); i++) {
+		CHECK(std::fabs(double(on[i]) / 44100 - at[i]) < 0.002);
+		CHECK(std::fabs(a.data[0][on[i]]) < 0.2f);
+	}
+}
+
+TEST_CASE("sensitivity trades weak hits; min gap merges flams") {
+	Audio a = hits({0.1, 0.5}, 1.2);
+	Audio weak = hits({0.9}, 1.2, 44100, 0.06f);
+	for (size_t i = 0; i < a.frames; i++) a.data[0][i] += weak.data[0][i];
+	auto env = onsetEnvelope(a);
+	OnsetOptions o;
+	o.sensitivity = 0.0f;
+	CHECK(pickOnsets(env, a, o).size() == 2);
+	o.sensitivity = 1.0f;
+	CHECK(pickOnsets(env, a, o).size() == 3);
+
+	Audio flam = hits({0.2, 0.215, 0.6}, 1.0);
+	auto fenv = onsetEnvelope(flam);
+	o.sensitivity = 0.8f;
+	o.minGap = 0.05;
+	CHECK(pickOnsets(fenv, flam, o).size() == 2);
+}
+
+TEST_CASE("zero-crossing snap") {
+	Audio a = silence(100);
+	for (size_t i = 0; i < 100; i++) a.data[0][i] = float(std::sin(2 * M_PI * double(i) / 40.0));  // crossings every 20
+	CHECK(snapToZeroCrossing(a, 47) == 40);
+	CHECK(snapToZeroCrossing(a, 0) == 0);
+	CHECK(snapToZeroCrossing(a, 47, 3) == 47);
+}
