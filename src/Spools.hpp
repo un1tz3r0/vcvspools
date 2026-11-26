@@ -71,6 +71,7 @@ struct Spools : Module {
 	std::atomic<bool> eco{false};
 	std::atomic<bool> embedAudio{true};
 	std::atomic<bool> retriggerPerNote{false};
+	std::atomic<float> loopXfade{0.01f};  // seconds
 	static constexpr int kNoteMode = 0, kLoopMode = 1;
 	std::atomic<int> playMode{kNoteMode};
 	bool wasLoopMode = false;  // audio thread

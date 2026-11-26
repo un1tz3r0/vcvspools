@@ -2,6 +2,12 @@
 
 Versions follow `TODO.md`: each `2.N.p` heading is one task, and the last one in a milestone is the released version.
 
+## 2.7.3
+
+- **Loop** tail: after its attack, a slice repeats a loop region until its gate ends. The region is set by hand or found automatically (transient end to slice end). Loops play forward with a raised-cosine crossfade into the audio before the loop start (SETTINGS → **Loop xfade**, 10 ms by default), or ping-pong. Reversed slices don't loop.
+- New **SLICE** page: a close-up of one slice with its trims, transient end and draggable loop flags, plus its per-slice settings as fields (drag numbers, click choices). The ‹ › buttons in the tab row step through slices.
+- Loop points and the ping-pong flag are saved with the patch.
+
 ## 2.7.2
 
 - Cut and Ring follow DESIGN §6.5 and have tests for both cases. When the slot is longer than the audio, the slice plays once with no click. When it is shorter, the slice fades at the slot end over the overlap time.

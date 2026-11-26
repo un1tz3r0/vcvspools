@@ -20,7 +20,7 @@ struct EnvTimeQuantity : ParamQuantity {
 };
 
 const std::vector<TailChoice>& tailChoices() {
-	static const std::vector<TailChoice> choices = {{TailMode::Ring, "Ring"}, {TailMode::Cut, "Cut"}};
+	static const std::vector<TailChoice> choices = {{TailMode::Ring, "Ring"}, {TailMode::Cut, "Cut"}, {TailMode::Loop, "Loop"}};
 	return choices;
 }
 
@@ -240,6 +240,7 @@ void Spools::onReset(const ResetEvent& e) {
 	eco = false;
 	embedAudio = true;
 	retriggerPerNote = false;
+	loopXfade = 0.01f;
 	barBeats = 0;
 	barsPerCycle = 0;
 	playMode = kNoteMode;
@@ -310,6 +311,7 @@ void Spools::process(const ProcessArgs& args) {
 		g.ampEnv = {envSeconds(params[AMP_A_PARAM].getValue()), envSeconds(params[AMP_D_PARAM].getValue()),
 			params[AMP_S_PARAM].getValue(), envSeconds(params[AMP_R_PARAM].getValue())};
 		g.retriggerPerNote = retriggerPerNote;
+		g.loopXfade = loopXfade;
 	}
 	VoiceParams vp = globalParams;
 
@@ -389,6 +391,9 @@ json_t* sliceParamsToJson(const SliceParams& p) {
 	num("cutoff", p.cutoff);
 	num("res", p.res);
 	num("xfade", p.xfade);
+	num("loopStart", p.loopStart);
+	num("loopEnd", p.loopEnd);
+	if (p.pingPong) json_object_set_new(j, "pingPong", json_true());
 	if (p.reverse) json_object_set_new(j, "reverse", json_true());
 	if (p.tail != TailMode::Inherit) json_object_set_new(j, "tail", json_integer(int(p.tail)));
 	return j;
@@ -404,6 +409,9 @@ void sliceParamsFromJson(json_t* j, SliceParams& p) {
 	num("cutoff", p.cutoff);
 	num("res", p.res);
 	num("xfade", p.xfade);
+	num("loopStart", p.loopStart);
+	num("loopEnd", p.loopEnd);
+	p.pingPong = json_is_true(json_object_get(j, "pingPong"));
 	p.reverse = json_is_true(json_object_get(j, "reverse"));
 	if (json_t* t = json_object_get(j, "tail")) p.tail = TailMode(clamp(int(json_integer_value(t)), 0, int(TailMode::Stretch)));
 }
@@ -414,6 +422,7 @@ json_t* Spools::dataToJson() {
 	json_object_set_new(root, "eco", json_boolean(eco));
 	json_object_set_new(root, "embedAudio", json_boolean(embedAudio));
 	json_object_set_new(root, "retriggerPerNote", json_boolean(retriggerPerNote));
+	json_object_set_new(root, "loopXfade", json_real(loopXfade));
 	json_object_set_new(root, "barBeats", json_real(barBeats));
 	json_object_set_new(root, "barsPerCycle", json_integer(barsPerCycle));
 	json_object_set_new(root, "mode", json_integer(playMode));
@@ -455,6 +464,7 @@ void Spools::dataFromJson(json_t* root) {
 	if (json_t* x = json_object_get(root, "eco")) eco = json_is_true(x);
 	if (json_t* x = json_object_get(root, "embedAudio")) embedAudio = json_is_true(x);
 	if (json_t* x = json_object_get(root, "retriggerPerNote")) retriggerPerNote = json_is_true(x);
+	if (json_t* x = json_object_get(root, "loopXfade")) loopXfade = float(json_number_value(x));
 	if (json_t* x = json_object_get(root, "barBeats")) barBeats = clamp(float(json_number_value(x)), 0.f, 64.f);
 	if (json_t* x = json_object_get(root, "displayPage")) displayPage = int(json_integer_value(x));
 	if (json_t* x = json_object_get(root, "viewSpan")) viewSpan = clamp(float(json_number_value(x)), 0.001f, 1.f);

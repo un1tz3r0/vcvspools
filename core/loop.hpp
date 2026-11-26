@@ -29,6 +29,11 @@ struct SliceParams {
 	float xfade = 0;                   // seconds
 	bool reverse = false;
 	TailMode tail = TailMode::Inherit;
+	// Loop tail: points in seconds from the slice start. loopEnd <= loopStart means "automatic":
+	// from the transient end to the slice end.
+	float loopStart = 0, loopEnd = 0;
+	bool pingPong = false;
+	bool hasLoopPoints() const { return loopEnd > loopStart; }
 };
 
 struct Slice {

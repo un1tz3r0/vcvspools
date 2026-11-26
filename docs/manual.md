@@ -13,7 +13,8 @@ Spools is an early proof of concept. See `DESIGN.md` for the planned behaviour a
 
 - **Display**: click the tabs along its top to switch pages.
   - **LOOP**: the loop, one colour per slice, with beat and bar lines, a playhead per voice in its slice's colour, and the region marked by an amber bracket (slices outside it are dimmed). The header shows the file, LOOP MODE and REX badges when they apply, the slice count, the length and the current BPM (a `?` means it was guessed).
-  - **SETTINGS**: every global option: mode, direction, tail, loop count, envelope retrigger, slicing, clock resolution, bar length, bars per cycle, interpolation quality and audio embedding. Click a row to pick a value. The same options are also in the right-click menu, grouped as Playback, Slicing, Transport and Engine.
+  - **SLICE**: a close-up of the selected slice (the first one, when several are selected; the playing one when none is). The ‹ › buttons in the tab row step through the slices. It shows the trims, the transient end (dotted line, `T`) and the loop region in amber, faint while automatic and bright once set by hand. Below are the slice's own settings: Pitch, Gain, Pan, Cutoff, Res and Xfade (drag up or down, Shift for fine, double-click to reset), and Reverse, Tail, Loop (Forward or Pingpong) and Points (Auto or Manual), which open a menu when clicked.
+  - **SETTINGS**: every global option: mode, direction, tail, loop crossfade, loop count, envelope retrigger, slicing, clock resolution, bar length, bars per cycle, interpolation quality and audio embedding. Click a row to pick a value. The same options are also in the right-click menu, grouped as Playback, Slicing, Transport and Engine.
 - **Tone strip** (the shaded band under the display): FILTER type (off, low-pass 12 dB, band-pass, high-pass 12 dB, notch, low-pass 24 dB), CUTOFF and RES, each with a CV-amount knob and a CV jack. Cutoff CV is 1 V/oct at 100%; resonance CV is 10 V = 100%. F.ENV sets how far the filter envelope moves the cutoff (±5 octaves). Then come the FILTER ENV and AMP ENV attack, decay, sustain and release knobs (0 to 10 s, exponential).
 - **Main row**: SLICE (start slice), LENGTH, trim IN/OUT, PITCH, LEVEL, XFADE (overlap), DUR (gate length in Cut mode), QUANT (launch quantize), BPM. Each knob with a CV jack has a small CV-amount knob above the jack.
 - **FROM** and **TO** (region) sit under DUR and BPM.
@@ -55,7 +56,15 @@ Set **Mode** to *Loop* on the SETTINGS page plays the region continuously on the
 
 RUN, CONT and BAR drive loop mode. RUN is a gate: high runs the loop, and its rising edge restarts it at the start slice. Unpatched means always running. CONT restarts at the start slice on the next clock pulse (at once with no clock). BAR realigns the bar count without moving the playback position. The SETTINGS page (or right-click → **Transport**) sets the **Bar length** (from the loop's meter by default) and **Bars per cycle**, which restarts the loop automatically every N bars (∞ = only on CONT).
 
-**Direction**, **Tail** (Ring/Cut) and **Loop count** are on the SETTINGS page (or right-click → **Playback**).
+**Direction**, **Tail** and **Loop count** are on the SETTINGS page (or right-click → **Playback**).
+
+### Tail modes
+
+The tail decides what a slice does when its time slot and its audio differ in length. Each slice can override the global tail on the SLICE page.
+
+- **Ring**: the slice plays to its end, or until the next slice starts.
+- **Cut**: the slice is gated at DUR × its slot and fades out over the overlap time.
+- **Loop**: the slice plays its attack once, then repeats its loop region until the gate (DUR × slot) ends, so short hits can sustain through long slots. The region runs from the transient end to the slice end unless you set it by hand. Drag the amber flags on the SLICE page to set it, and double-click the waveform to return to automatic. Loops play forward with a crossfade (**Loop xfade** on the SETTINGS page, 10 ms by default) or ping-pong without one. Reversed slices play once without looping.
 
 ## Crop and tempo
 

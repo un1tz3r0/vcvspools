@@ -47,4 +47,5 @@ struct Page {
 };
 
 std::unique_ptr<Page> makeLoopPage();
+std::unique_ptr<Page> makeSlicePage();
 std::unique_ptr<Page> makeSettingsPage();

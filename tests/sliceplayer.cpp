@@ -114,3 +114,52 @@ TEST_CASE("eco quality is usable") {
 	for (size_t i = 100; i < out.size(); i++) maxErr = std::max(maxErr, std::fabs(out[i] - std::sin(2 * M_PI * 1000 * (100 + i * 0.7071) / 48000)));
 	CHECK(maxErr < 2e-2);
 }
+
+TEST_CASE("loops: a forward loop with crossfade plays seamlessly past the span end") {
+	auto a = std::make_shared<Audio>();
+	a->sampleRate = 48000;
+	a->channels = 1;
+	a->frames = 4800;
+	for (size_t i = 0; i < a->frames; i++) a->data[0].push_back(0.5f * float(std::sin(2 * M_PI * i / 48.0)));  // 1 kHz
+	SlicePlayer p;
+	p.start(a.get(), {0, 4800, false}, 1.0, 48000);
+	p.setLoop({1200, 2400 + 7, false, 96});  // a loop length that is NOT a whole number of periods
+	REQUIRE(p.looping());
+	float l, r, prev = 0, maxStep = 0;
+	for (int i = 0; i < 48000; i++) {
+		REQUIRE(p.process(l, r));
+		if (i > 100) maxStep = std::max(maxStep, std::fabs(l - prev));
+		prev = l;
+	}
+	CHECK(maxStep < 0.5f * 2 * float(M_PI) / 48 * 1.6f);  // never steeper than the sine (plus crossfade wobble)
+	CHECK(p.position() >= 1200);
+	CHECK(p.position() < 2407);
+	p.stop(0.005f);
+	int n = 0;
+	while (p.process(l, r)) n++;
+	CHECK(n == doctest::Approx(240).epsilon(0.02));
+}
+
+TEST_CASE("loops: ping-pong turns at both ends; reversed spans ignore loops") {
+	auto a = std::make_shared<Audio>();
+	a->sampleRate = 48000;
+	a->channels = 1;
+	a->frames = 1000;
+	for (size_t i = 0; i < a->frames; i++) a->data[0].push_back(float(i) / 1000.f);  // ramp
+	SlicePlayer p;
+	p.start(a.get(), {0, 1000, false}, 1.0, 48000);
+	p.setLoop({400, 600, true, 0});
+	float l, r;
+	double lo = 1e9, hi = 0;
+	for (int i = 0; i < 2000; i++) {
+		p.process(l, r);
+		if (i > 700) { lo = std::min(lo, p.position()); hi = std::max(hi, p.position()); }
+	}
+	CHECK(lo == doctest::Approx(400).epsilon(0.01));
+	CHECK(hi == doctest::Approx(600).epsilon(0.01));
+
+	SlicePlayer q;
+	q.start(a.get(), {0, 1000, true}, 1.0, 48000);
+	q.setLoop({400, 600, false, 0});
+	CHECK_FALSE(q.looping());
+}

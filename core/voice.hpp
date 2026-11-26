@@ -23,6 +23,7 @@ struct VoiceParams {
 	float res = 0;                     // 0..1
 	AdsrTimes ampEnv, filterEnv{0, 0.3f, 0, 0.1f};
 	float filterEnvAmount = 0;         // octaves at full envelope, -5..5
+	float loopXfade = 0.01f;           // seconds, Loop tail crossfade
 	bool retriggerPerNote = false;     // envelopes restart on each slice unless set
 	const SincTable* quality = &SincTable::hq();
 };
@@ -33,6 +34,10 @@ struct VoiceOut {
 	bool trig = false, eoc = false, playing = false;
 	float ampEnv = 0, filterEnv = 0;
 };
+
+// Loop-tail points for slice i: its manual points, else from the transient end (a quarter in when
+// features are not ready) to the end of the span.
+SlicePlayer::LoopPoints loopPoints(const Loop& l, size_t i, const SlicePlayer::Span& span, const VoiceParams& vp);
 
 // One note-mode voice: a phrase sequencer driving two slice players so a new slice can start
 // while the previous one fades out underneath it.

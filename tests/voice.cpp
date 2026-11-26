@@ -249,3 +249,28 @@ TEST_CASE("tail modes when the slot and the audio differ in length") {
 	auto rs = render(vs, *l, p, ring, 0.25, 14000);
 	CHECK(rs.l[7000] == 0.f);
 }
+
+TEST_CASE("Loop tail sustains a slice through a long slot, from its own loop points when set") {
+	auto loop = steps();
+	PhraseParams p;
+	p.length = 1;
+	VoiceParams vp;
+	vp.tail = TailMode::Loop;
+	Voice v;
+	auto r = render(v, *loop, p, vp, 0.5, 30000);  // slot 24000, audio 12000
+	CHECK(r.l[11000] == doctest::Approx(0.1f).epsilon(0.01));
+	CHECK(r.l[20000] == doctest::Approx(0.1f).epsilon(0.01));  // still looping past the audio end
+	CHECK(r.l[25000] == 0.f);                                  // gated at the slot end
+
+	auto l = std::make_shared<Loop>(*loop);
+	l->slices[0].p.loopStart = 0.1f;
+	l->slices[0].p.loopEnd = 0.2f;
+	l->slices[0].p.pingPong = true;
+	auto lp = loopPoints(*l, 0, SlicePlayer::span(*l->audio, 0, 12000, 0, 0, false), vp);
+	CHECK(lp.start == doctest::Approx(4800));
+	CHECK(lp.end == doctest::Approx(9600));
+	CHECK(lp.pingPong);
+	auto a = loopPoints(*loop, 0, SlicePlayer::span(*loop->audio, 0, 12000, 0, 0, false), vp);
+	CHECK(a.start == 3000);  // no features yet: a quarter in
+	CHECK(a.end == 12000);
+}

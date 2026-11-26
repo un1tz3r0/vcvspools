@@ -36,6 +36,8 @@ std::vector<Setting> moduleSettings(Spools* m) {
 	s.push_back(paramChoice("Playback", "Loop count", m, Spools::LOOP_COUNT_PARAM, loops));
 	s.push_back({"Playback", "Retrigger", {"Each slice", "Each note"},
 		[=] { return size_t(m->retriggerPerNote.load()); }, [=](size_t i) { m->retriggerPerNote = i == 1; }});
+	s.push_back(choice<float>("Playback", "Loop xfade", {"Off", "2 ms", "5 ms", "10 ms", "20 ms", "50 ms", "100 ms"},
+		{0, 0.002f, 0.005f, 0.01f, 0.02f, 0.05f, 0.1f}, [=] { return m->loopXfade.load(); }, [=](float v) { m->loopXfade = v; }));
 
 	auto reslice = [=] { m->reslice(); };
 	s.push_back(choice<int>("Slicing", "Slice by", {"Onsets", "Grid", "Hybrid"}, {0, 1, 2},

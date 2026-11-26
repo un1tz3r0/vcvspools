@@ -17,7 +17,16 @@ public:
 	// Trims are in seconds (positive moves later) and are clamped to the audio.
 	static Span span(const Audio& a, size_t start, size_t end, float startTrim, float endTrim, bool reverse);
 
+	struct LoopPoints {
+		double start = 0, end = 0;  // source frames inside the span
+		bool pingPong = false;
+		double xfade = 0;           // frames; forward loops only
+	};
+
 	void start(const Audio* audio, Span s, double rate, float engineRate);
+	// Loops [start, end) until stop(); forward spans only. Call right after start().
+	void setLoop(LoopPoints lp);
+	bool looping() const { return loopOn; }
 	void setRate(double r) { rate = r; }
 	void setQuality(const SincTable* t) { sinc = t; }
 	// Fades out over `seconds` (at least the declick time) and goes idle.
@@ -37,6 +46,9 @@ private:
 	const SincTable* sinc = &SincTable::hq();
 	Span s;
 	double pos = 0, rate = 1;
+	LoopPoints lp;
+	bool loopOn = false;
+	double dir = 1;
 	float gain = 0, fadeStep = 0, declickStep = 0, sampleRate = 48000;
 	float read(int channel, double x) const;
 };
