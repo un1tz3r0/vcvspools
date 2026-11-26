@@ -64,7 +64,7 @@ void Spools::publish(std::shared_ptr<const Loop> l) {
 void Spools::load(const std::string& path, std::shared_ptr<SavedLoop> saved) {
 	loading = true;
 	std::string embedded = saved ? system::join(getPatchStorageDirectory(), "loop.wav") : "";
-	worker->post([this, path, saved, embedded] {
+	worker->post([this, path, saved, embedded, slicing = slicing] {
 		std::string err;
 		std::shared_ptr<Loop> l = path.empty() ? nullptr : loadLoop(path, &err);
 		bool fromEmbed = false;
@@ -84,6 +84,7 @@ void Spools::load(const std::string& path, std::shared_ptr<SavedLoop> saved) {
 			r->regionEnd = std::min(std::max(saved->regionEnd, r->regionStart), r->slices.size() - 1);
 			l = r;
 		}
+		else if (l && l->origin == Origin::Plain) l = autoSlice(*l, slicing);
 		if (l) {
 			if (fromEmbed) l->sourcePath = path;
 			publish(l);
@@ -100,11 +101,23 @@ void Spools::sliceEvenly(size_t count) {
 	worker->post([this, cur, count] { publish(spools::sliceEvenly(*cur, count)); });
 }
 
+void Spools::reslice() {
+	auto cur = loop();
+	if (!cur) return;
+	worker->post([this, cur, s = slicing] {
+		auto l = autoSlice(*cur, s);
+		l->regionStart = std::min(cur->regionStart, l->slices.size() - 1);
+		l->regionEnd = std::min(std::max(cur->regionEnd, l->regionStart), l->slices.size() - 1);
+		publish(l);
+	});
+}
+
 void Spools::onReset(const ResetEvent& e) {
 	Module::onReset(e);
 	ppqn = 1;
 	eco = false;
 	embedAudio = true;
+	slicing = {};
 }
 
 void Spools::process(const ProcessArgs& args) {
@@ -233,6 +246,12 @@ json_t* Spools::dataToJson() {
 	json_object_set_new(root, "ppqn", json_integer(ppqn));
 	json_object_set_new(root, "eco", json_boolean(eco));
 	json_object_set_new(root, "embedAudio", json_boolean(embedAudio));
+	json_t* js = json_object();
+	json_object_set_new(js, "mode", json_integer(int(slicing.mode)));
+	json_object_set_new(js, "gridBeats", json_real(slicing.gridBeats));
+	json_object_set_new(js, "sensitivity", json_real(slicing.sensitivity));
+	json_object_set_new(js, "snap", json_real(slicing.snap));
+	json_object_set_new(root, "slicing", js);
 	auto l = loop();
 	if (!l) return root;
 	json_t* j = json_object();
@@ -260,6 +279,12 @@ void Spools::dataFromJson(json_t* root) {
 	if (json_t* x = json_object_get(root, "ppqn")) ppqn = clamp(int(json_integer_value(x)), 1, 96);
 	if (json_t* x = json_object_get(root, "eco")) eco = json_is_true(x);
 	if (json_t* x = json_object_get(root, "embedAudio")) embedAudio = json_is_true(x);
+	if (json_t* js = json_object_get(root, "slicing")) {
+		slicing.mode = SliceMode(clamp(int(json_integer_value(json_object_get(js, "mode"))), 0, 2));
+		if (json_t* x = json_object_get(js, "gridBeats")) slicing.gridBeats = std::min(std::max(json_number_value(x), 1.0 / 64), 4.0);
+		if (json_t* x = json_object_get(js, "sensitivity")) slicing.sensitivity = clamp(float(json_number_value(x)), 0.f, 1.f);
+		if (json_t* x = json_object_get(js, "snap")) slicing.snap = clamp(float(json_number_value(x)), 0.f, 1.f);
+	}
 	json_t* j = json_object_get(root, "loop");
 	if (!j) return;
 	auto saved = std::make_shared<SavedLoop>();

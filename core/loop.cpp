@@ -157,6 +157,7 @@ std::shared_ptr<Loop> sliceEvenly(const Loop& old, size_t count) {
 	auto loop = makeLoop(old.source, old.crop, old.bpm, old.bpmKnown, starts, old.origin, old.sourcePath);
 	loop->meterNum = old.meterNum;
 	loop->meterDen = old.meterDen;
+	loop->onsets = old.onsets;  // same crop, same analysis
 	return loop;
 }
 

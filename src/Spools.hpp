@@ -6,6 +6,7 @@
 #include "plugin.hpp"
 #include "core/exchange.hpp"
 #include "core/loop.hpp"
+#include "core/slicing.hpp"
 #include "core/timebase.hpp"
 #include "core/voice.hpp"
 #include "core/worker.hpp"
@@ -54,6 +55,7 @@ struct Spools : Module {
 	std::atomic<int> ppqn{1};
 	std::atomic<bool> eco{false};
 	std::atomic<bool> embedAudio{true};
+	spools::SliceSettings slicing;  // UI thread only; workers get a copy
 
 	// Display feedback from the audio thread.
 	std::atomic<int> playingSlice[kMaxVoices];
@@ -86,6 +88,7 @@ struct Spools : Module {
 	void publish(std::shared_ptr<const spools::Loop> loop);
 	std::shared_ptr<const spools::Loop> loop() { return exchange.latest(); }
 	void sliceEvenly(size_t count);
+	void reslice();  // re-runs auto-slicing with the current settings
 
 	int regionIndex(float frac, size_t slices) const;
 };

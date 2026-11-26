@@ -2,6 +2,13 @@
 
 Versions follow `TODO.md`: each `2.N.p` heading is one task, and the last one in a milestone is the released version.
 
+## 2.3.4
+
+- Auto-slicing modes: Onsets, Grid (1/4 to 1/32 and triplets) and Hybrid (grid plus strong off-grid hits), with grid-snap strength and sensitivity.
+- The grid is aligned to the median offset of detected hits, so flux-envelope latency no longer shifts it by a few ms. Slices shorter than the minimum gap at the end are dropped.
+- Plain audio files are sliced and tempo-estimated on load. The onset envelope is cached on the loop, so re-slicing only re-picks.
+- Context menu **Auto-slice** submenu; each change re-slices on the worker. Settings are saved in the patch.
+
 ## 2.3.3
 
 - Tempo estimation: autocorrelation of the onset envelope scored over four lag multiples (comb), with a log-normal prior centred on 120 BPM between 60 and 200 BPM, plus a confidence value.

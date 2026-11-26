@@ -5,7 +5,7 @@ Spools is an early proof of concept. See `DESIGN.md` for the planned behaviour a
 ## Quick start
 
 1. Right-click the module and choose **Load sample…**. Pick a WAV/AIFF/FLAC/MP3/Ogg file or a REX2 loop.
-2. Plain audio arrives as one slice. Use **Slice evenly** to cut it until automatic slicing arrives.
+2. Plain audio is sliced automatically at its hits, and its tempo is estimated (shown with a `?`). REX and Acidized files keep their own slices and tempo. Right-click → **Auto-slice** to change how it is cut, or **Slice evenly** for equal slices.
 3. Patch a gate or trigger into **GATE**. C4 (0 V) on **V/OCT** plays the start slice, and each semitone up or down plays the next or previous slice.
 4. Patch a clock into **CLOCK** and set its resolution in the menu. Without one, Spools uses the **BPM** knob, or the loop's own tempo when the knob is at 0.
 
@@ -25,6 +25,16 @@ Spools is an early proof of concept. See `DESIGN.md` for the planned behaviour a
 - **REGION** start/end limit which slices are reachable. Note offsets wrap inside the region.
 - **TAIL**: *Ring* lets each slice play out. *Cut* gates it after **DURATION** × its time slot.
 - **OVERLAP** is how long a slice keeps fading out after the next one starts.
+
+## Auto-slice
+
+Right-click → **Auto-slice**. Every change re-slices at once, and the setting is saved with the patch. Re-slicing resets per-slice settings.
+
+- **Mode**: *Onsets* cuts at each detected hit. *Grid* cuts at every grid step. *Hybrid* uses the grid plus any strong hit that falls between grid lines.
+- **Grid**: 1/4 to 1/32 notes, or 1/8 and 1/16 triplets.
+- **Sensitivity**: higher finds quieter hits.
+- **Grid snap**: in Onsets mode, moves each hit toward its nearest grid line, from 0% (where it was found) to 100% (on the grid).
+- **Re-slice now** applies the settings to a REX or Acidized file too, replacing its own slices.
 
 ## Outputs
 

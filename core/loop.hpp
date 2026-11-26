@@ -4,6 +4,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include "analysis.hpp"
 #include "audio.hpp"
 
 namespace spools {
@@ -63,6 +64,7 @@ struct Loop {
 	std::vector<Slice> slices;          // sorted, slices[0].start == 0
 	size_t regionStart = 0, regionEnd = 0;  // slice indices, inclusive
 	WaveformMips mips;
+	std::shared_ptr<const OnsetEnvelope> onsets;  // cached analysis of `audio`, or null
 
 	size_t sliceEnd(size_t i) const { return i + 1 < slices.size() ? slices[i + 1].start : audio->frames; }
 	double beats() const { return audio->seconds() * bpm / 60.0; }

@@ -36,6 +36,30 @@ void chooseFile(Spools* module) {
 	std::free(path);
 }
 
+// Each change re-slices right away, so the menu doubles as a preview.
+void slicingMenu(Menu* menu, Spools* m) {
+	auto choice = [=](const char* name, std::vector<std::string> labels, std::vector<double> values, auto get, auto set) {
+		menu->addChild(createIndexSubmenuItem(name, labels,
+			[=] {
+				double v = get();
+				size_t best = 0;
+				for (size_t i = 1; i < values.size(); i++)
+					if (std::fabs(values[i] - v) < std::fabs(values[best] - v)) best = i;
+				return best;
+			},
+			[=](size_t i) { set(values[i]); m->reslice(); }));
+	};
+	choice("Mode", {"Onsets", "Grid", "Hybrid (grid + strong hits)"}, {0, 1, 2},
+		[=] { return double(m->slicing.mode); }, [=](double v) { m->slicing.mode = spools::SliceMode(int(v)); });
+	choice("Grid", {"1/4", "1/8", "1/16", "1/32", "1/8 triplet", "1/16 triplet"}, {1, 0.5, 0.25, 0.125, 1.0 / 3, 1.0 / 6},
+		[=] { return m->slicing.gridBeats; }, [=](double v) { m->slicing.gridBeats = v; });
+	std::vector<std::string> pct = {"0%", "25%", "50%", "75%", "100%"};
+	std::vector<double> frac = {0, 0.25, 0.5, 0.75, 1};
+	choice("Sensitivity", pct, frac, [=] { return double(m->slicing.sensitivity); }, [=](double v) { m->slicing.sensitivity = float(v); });
+	choice("Grid snap", pct, frac, [=] { return double(m->slicing.snap); }, [=](double v) { m->slicing.snap = float(v); });
+	menu->addChild(createMenuItem("Re-slice now", "", [=] { m->reslice(); }));
+}
+
 }
 
 struct SpoolsWidget : ModuleWidget {
@@ -112,6 +136,7 @@ struct SpoolsWidget : ModuleWidget {
 			for (int n : {1, 2, 4, 8, 16, 32, 64})
 				sub->addChild(createMenuItem(string::f("%d slices", n), "", [=] { m->sliceEvenly(size_t(n)); }));
 		}));
+		menu->addChild(createSubmenuItem("Auto-slice", "", [=](Menu* sub) { slicingMenu(sub, m); }));
 		static const std::vector<int> ppqns = {1, 2, 4, 8, 24, 48, 96};
 		std::vector<std::string> labels;
 		for (int p : ppqns) labels.push_back(string::f("%d PPQN", p));
