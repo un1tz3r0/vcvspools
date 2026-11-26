@@ -6,6 +6,7 @@
 #include <string>
 #include "plugin.hpp"
 #include "core/exchange.hpp"
+#include "core/panel.hpp"
 #include "core/pattern.hpp"
 #include "core/length.hpp"
 #include "core/loop.hpp"
@@ -56,7 +57,7 @@ struct Spools : Module {
 		OVERLAP_INPUT, QUANTIZE_INPUT, CUTOFF_INPUT, RES_INPUT, RUN_INPUT, CONT_INPUT, BAR_INPUT,
 		INPUTS_LEN
 	};
-	enum OutputId { LEFT_OUTPUT, RIGHT_OUTPUT, SLICE_OUTPUT, TRIG_OUTPUT, EOC_OUTPUT, AMP_ENV_OUTPUT, FILTER_ENV_OUTPUT, OUTPUTS_LEN };
+	enum OutputId { LEFT_OUTPUT, RIGHT_OUTPUT, SLICE_OUTPUT, TRIG_OUTPUT, EOC_OUTPUT, AMP_ENV_OUTPUT, FILTER_ENV_OUTPUT, SEND_A_OUTPUT, SEND_B_OUTPUT, CV_A_OUTPUT, CV_B_OUTPUT, OUTPUTS_LEN };
 	enum LightId { LIGHTS_LEN };
 
 	static constexpr int kMaxVoices = 16;
@@ -93,6 +94,7 @@ struct Spools : Module {
 	std::atomic<int> barsPerCycle{0};
 	// Display state (UI thread).
 	int displayPage = 0;
+	int panelHp = spools::kPanelMinHp;  // dragged with the resize handle
 	int patternStep = 0;  // step being edited on the PATTERN page
 	float viewStart = 0, viewSpan = 1;  // visible part of the loop, as fractions of its length
 	bool cropView = false;              // LOOP page shows the whole source file with crop handles

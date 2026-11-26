@@ -80,6 +80,10 @@ void Voice::begin(const SeqEvent& e, double slotSeconds, const Loop& l, const Vo
 
 	auto span = SlicePlayer::span(*l.audio, s.start, l.sliceEnd(size_t(slice)), r.startTrim, r.endTrim, r.reverse);
 	pitch.snap(r.pitch);  // a new slice starts at its own pitch; only changes while it plays glide
+	send[0].snap(s.p.sendA);
+	send[1].snap(s.p.sendB);
+	cv[0] = s.p.cvA;
+	cv[1] = s.p.cvB;
 	velocity[cur] = e.gain;
 	gain[cur].snap(dbToGain(r.gain) * e.gain);
 	if (sliceOf[0] < 0 && sliceOf[1] < 0) { cutoff.snap(r.cutoff); res.snap(r.res); }  // first note: no sweep in
@@ -145,6 +149,8 @@ VoiceOut Voice::play(const SeqEvent& e, double beatPeriod, const Loop& l, const 
 		out.ampEnv = amp[cur].value();
 		out.filterEnv = fe;
 		out.slice = lastSlice;
+		out.cvA = cv[0];
+		out.cvB = cv[1];
 		controlCountdown = targetCountdown = 0;  // refresh everything on the next sound
 		return out;
 	}
@@ -157,6 +163,8 @@ VoiceOut Voice::play(const SeqEvent& e, double beatPeriod, const Loop& l, const 
 		const float c = glideCoef;
 		gain[0].step(c);
 		gain[1].step(c);
+		send[0].step(c);
+		send[1].step(c);
 		const float st = pitch.step(c);
 		if (players[cur].active() && st != lastPitch) {
 			lastPitch = st;
@@ -184,6 +192,11 @@ VoiceOut Voice::play(const SeqEvent& e, double beatPeriod, const Loop& l, const 
 	out.filterEnv = fe;
 	out.left = filter.process(0, l0);
 	out.right = filter.process(1, r0);
+	const float mono = 0.5f * (out.left + out.right);
+	out.sendA = mono * send[0].value;
+	out.sendB = mono * send[1].value;
+	out.cvA = cv[0];
+	out.cvB = cv[1];
 	out.slice = lastSlice;
 	out.playing = players[0].active() || players[1].active();
 	quiet = !out.playing && std::fabs(out.left) + std::fabs(out.right) < 1e-6f ? quiet + 1 : 0;
@@ -198,6 +211,9 @@ void Voice::updateTargets(const Loop& l, const VoiceParams& vp) {
 	const SliceParams& sp = lastSlice >= 0 && size_t(lastSlice) < l.slices.size() ? l.slices[size_t(lastSlice)].p : none;
 	const Resolved r = resolve(vp, sp);
 	pitch.target = std::clamp(r.pitch + eventPitch, -48.f, 48.f);
+	send[0].target = std::clamp(sp.sendA, 0.f, 1.f);
+	send[1].target = std::clamp(sp.sendB, 0.f, 1.f);
+	if (lastSlice >= 0) { cv[0] = std::clamp(sp.cvA, -10.f, 10.f); cv[1] = std::clamp(sp.cvB, -10.f, 10.f); }
 	cutoff.target = r.cutoff;
 	res.target = r.res;
 }
