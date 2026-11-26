@@ -1,4 +1,5 @@
 #include <doctest/doctest.h>
+#include <algorithm>
 #include <cmath>
 #include <vector>
 #include "pattern.hpp"
@@ -160,4 +161,36 @@ TEST_CASE("velocity scales the voice's level") {
 		e = {};
 	}
 	CHECK(x == doctest::Approx(0.05f).epsilon(0.02));
+}
+
+TEST_CASE("menu actions: shuffle keeps the rhythm, reverse flips steps, insert and remove keep the range") {
+	auto l = steps4();
+	Pattern p = initFromLoop(*l);
+	p.steps[0].ticks = 2;
+	Pattern s = shuffled(p, 42);
+	std::vector<int> slices;
+	for (size_t i = 0; i < 4; i++) {
+		CHECK(s.steps[i].ticks == p.steps[i].ticks);
+		slices.push_back(s.steps[i].slice);
+	}
+	std::sort(slices.begin(), slices.end());
+	CHECK(slices == std::vector<int>{0, 1, 2, 3});
+	CHECK(shuffled(p, 42).steps[0].slice == s.steps[0].slice);  // deterministic per seed
+
+	Pattern r = reversed(p);
+	CHECK(r.steps[0].slice == 3);
+	CHECK(r.steps[3].ticks == 2);
+
+	p.loopStart = 1;
+	p.loopEnd = 2;
+	Pattern ins = withStepInserted(p, 1, {-1, 4});
+	CHECK(ins.steps.size() == 5);
+	CHECK(ins.steps[1].slice == -1);
+	CHECK(ins.loopEnd == 3);
+	Pattern rem = withStepRemoved(ins, 0);
+	CHECK(rem.loopStart == 0);
+	CHECK(rem.loopEnd == 2);
+	Pattern one;
+	one.steps = {{0, 4}};
+	CHECK(withStepRemoved(one, 0).steps.size() == 1);
 }

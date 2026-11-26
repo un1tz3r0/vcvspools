@@ -2,6 +2,18 @@
 
 Versions follow `TODO.md`: each `2.N.p` heading is one task, and the last one in a milestone is the released version.
 
+## 2.9.3
+
+- **PATTERN** page:
+  - steps drawn as blocks sized by length and tinted by slice;
+  - drag a step to change its slice, Alt-drag for velocity, drag its edge for length, scroll for ratchets;
+  - drag tabs to set the play range;
+  - double-click to duplicate or add a step, Ctrl-double-click to delete;
+  - fields for every step setting;
+  - a marker under each step that a voice is playing.
+- Right-click → **Pattern**: Init from loop, Shuffle slices, Reverse steps, Add rest, Delete step, Play every step, Direction and Loop count.
+- The pattern now belongs to the loop. Pattern edits go through the same publish and undo path as slice edits. The pattern is saved in the patch and, with per-slice settings, in the embedded WAV's `spls` chunk, which is read back on load. Before this, the manual said per-slice settings went into `spls`, but nothing wrote them.
+
 ## 2.9.2
 
 - Ratchets: a pattern step can play its slice 1–8 times within its length. The ratchet curve spaces the hits evenly (0), as a roll that speeds up (> 0) or one that slows down (< 0). Each hit is gated for its own share of the step.

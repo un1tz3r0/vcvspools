@@ -251,6 +251,43 @@ struct SpoolsWidget : ModuleWidget {
 		ModuleWidget::step();
 	}
 
+	// Pattern mode's menu actions (DESIGN §11); each is one undo step.
+	static void patternMenu(Menu* menu, Spools* m) {
+		auto l = m->loop();
+		if (!l || !l->pattern) { menu->addChild(createMenuLabel("Load a sample first")); return; }
+		auto act = [=](const char* name, std::function<spools::Pattern(const spools::Pattern&)> f) {
+			menu->addChild(createMenuItem(name, "", [=] {
+				if (auto cur = m->loop(); cur && cur->pattern) m->setPattern(cur, f(*cur->pattern), name);
+			}));
+		};
+		act("Init from loop", [=](const spools::Pattern&) { return spools::initFromLoop(*m->loop()); });
+		act("Shuffle slices", [](const spools::Pattern& p) { return spools::shuffled(p, uint32_t(random::u32())); });
+		act("Reverse steps", [](const spools::Pattern& p) { return spools::reversed(p); });
+		act("Add rest at end", [](const spools::Pattern& p) { return spools::withStepInserted(p, p.steps.size(), {-1, 4}); });
+		act("Delete selected step", [=](const spools::Pattern& p) { return spools::withStepRemoved(p, size_t(std::max(0, m->patternStep))); });
+		act("Play every step", [](const spools::Pattern& p) { auto q = p; q.loopStart = 0; q.loopEnd = -1; return q; });
+		menu->addChild(createIndexSubmenuItem("Direction", {"Forward", "Reverse", "Ping-pong", "Random"},
+			[=] { auto c = m->loop(); return c && c->pattern ? size_t(c->pattern->direction) : 0; },
+			[=](size_t i) {
+				auto c = m->loop();
+				if (!c || !c->pattern) return;
+				auto q = *c->pattern;
+				q.direction = spools::Direction(i);
+				m->setPattern(c, q, "pattern direction");
+			}));
+		std::vector<std::string> counts = {"∞"};
+		for (int i = 1; i <= 16; i++) counts.push_back(std::to_string(i));
+		menu->addChild(createIndexSubmenuItem("Loop count", counts,
+			[=] { auto c = m->loop(); return c && c->pattern ? size_t(std::min(c->pattern->loopCount, 16)) : 0; },
+			[=](size_t i) {
+				auto c = m->loop();
+				if (!c || !c->pattern) return;
+				auto q = *c->pattern;
+				q.loopCount = int(i);
+				m->setPattern(c, q, "pattern loop count");
+			}));
+	}
+
 	void appendContextMenu(Menu* menu) override {
 		auto* m = getModule<Spools>();
 		menu->addChild(new MenuSeparator);
@@ -261,6 +298,7 @@ struct SpoolsWidget : ModuleWidget {
 		}));
 		menu->addChild(createSubmenuItem("Crop", "", [=](Menu* sub) { cropMenu(sub, m); }));
 		menu->addChild(createSubmenuItem("Loop tempo", "", [=](Menu* sub) { tempoMenu(sub, m); }));
+		menu->addChild(createSubmenuItem("Pattern", "", [=](Menu* sub) { patternMenu(sub, m); }));
 		menu->addChild(new MenuSeparator);
 		appendSettingsMenus(menu, m);
 	}

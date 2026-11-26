@@ -1,5 +1,6 @@
 #include "pattern.hpp"
 #include <cmath>
+#include <algorithm>
 #include "units.hpp"
 
 namespace spools {
@@ -39,6 +40,39 @@ Pattern initFromLoop(const Loop& l) {
 		p.steps.push_back(s);
 	}
 	return p;
+}
+
+Pattern shuffled(const Pattern& p, uint32_t seed) {
+	Pattern out = p;
+	uint32_t r = seed ? seed : 1;
+	for (size_t i = out.steps.size(); i > 1; i--) {  // Fisher-Yates over the slices only
+		r ^= r << 13; r ^= r >> 17; r ^= r << 5;
+		std::swap(out.steps[i - 1].slice, out.steps[r % i].slice);
+	}
+	return out;
+}
+
+Pattern reversed(const Pattern& p) {
+	Pattern out = p;
+	std::reverse(out.steps.begin(), out.steps.end());
+	return out;
+}
+
+Pattern withStepInserted(const Pattern& p, size_t at, const PatternStep& s) {
+	Pattern out = p;
+	if (out.steps.size() >= kMaxPatternSteps) return out;
+	out.steps.insert(out.steps.begin() + long(std::min(at, out.steps.size())), s);
+	if (out.loopEnd >= 0 && int(at) <= out.loopEnd) out.loopEnd++;
+	return out;
+}
+
+Pattern withStepRemoved(const Pattern& p, size_t at) {
+	Pattern out = p;
+	if (out.steps.size() <= 1 || at >= out.steps.size()) return out;
+	out.steps.erase(out.steps.begin() + long(at));
+	if (out.loopEnd >= 0 && int(at) <= out.loopEnd) out.loopEnd = std::max(0, out.loopEnd - 1);
+	if (int(at) < out.loopStart) out.loopStart--;
+	return out;
 }
 
 SeqEvent PatternSequencer::process(double loopBeat, bool running, bool restart, int semis, const Loop& l, const Pattern& pat) {

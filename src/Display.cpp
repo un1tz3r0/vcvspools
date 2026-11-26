@@ -9,6 +9,7 @@ constexpr float kTabW = 84;
 SpoolsDisplay::SpoolsDisplay() {
 	pages.push_back(makeLoopPage());
 	pages.push_back(makeSlicePage());
+	pages.push_back(makePatternPage());
 	pages.push_back(makeSettingsPage());
 }
 

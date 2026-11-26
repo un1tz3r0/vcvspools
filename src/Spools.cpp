@@ -94,7 +94,7 @@ Spools::Spools() {
 	configOutput(SLICE_OUTPUT, "Slice index (1/12 V per slice)");
 	configOutput(TRIG_OUTPUT, "Slice start trigger");
 	configOutput(EOC_OUTPUT, "End of phrase");
-	for (int c = 0; c < kMaxVoices; c++) { playingSlice[c] = -1; playheads[c] = -1.f; }
+	for (int c = 0; c < kMaxVoices; c++) { playingSlice[c] = -1; playheads[c] = -1.f; playingStep[c] = -1; }
 	paramDivider.setDivision(32);
 	paramDivider.clock = 31;  // read the knobs on the first sample
 	worker.reset(new Worker);
@@ -132,8 +132,10 @@ void Spools::load(const std::string& path, std::shared_ptr<SavedLoop> saved) {
 			for (size_t i = 0; i < r->slices.size() && i < saved->slices.size(); i++) r->slices[i].p = saved->slices[i].p;
 			r->regionStart = std::min(saved->regionStart, r->slices.size() - 1);
 			r->regionEnd = std::min(std::max(saved->regionEnd, r->regionStart), r->slices.size() - 1);
+			r->pattern = saved->pattern;
 			l = r;
 		}
+		else if (l && !l->spls.empty()) applySpls(*l);  // a file Spools saved: its slice settings and pattern
 		else if (l && l->origin == Origin::Plain) l = autoSlice(*l, slicing);
 		if (l) {
 			if (fromEmbed) l->sourcePath = path;
@@ -277,7 +279,7 @@ void Spools::process(const ProcessArgs& args) {
 
 	const int mode = playMode;
 	const bool transported = mode != kNoteMode;
-	const Pattern* pat = patterns.acquire();
+	const Pattern* pat = l ? l->pattern.get() : nullptr;
 	if (mode != wasMode) {  // switching modes: silence everything and start clean
 		for (int c = 0; c < kMaxVoices; c++) { voices[c].reset(); loopSeqs[c].reset(); patternSeqs[c].reset(); }
 		wasMode = mode;
@@ -360,20 +362,32 @@ void Spools::process(const ProcessArgs& args) {
 		outputs[AMP_ENV_OUTPUT].setVoltage(10.f * o.ampEnv, c);
 		outputs[FILTER_ENV_OUTPUT].setVoltage(10.f * o.filterEnv, c);
 		playingSlice[c] = o.playing ? o.slice : -1;
+		playingStep[c] = mode == kPatternMode ? patternSeqs[c].currentStep() : -1;
 		playheads[c] = o.playing ? float(voices[c].player().position()) : -1.f;
 	}
 	for (int c = channels; c < kMaxVoices; c++) {
 		if (playheads[c] >= 0.f) { voices[c].reset(); playheads[c] = -1.f; playingSlice[c] = -1; }
 		loopSeqs[c].reset();
 		patternSeqs[c].reset();
+		playingStep[c] = -1;
 	}
+}
+
+std::shared_ptr<const Loop> Spools::setPattern(std::shared_ptr<const Loop> base, Pattern p, const std::string& name, bool publishOnly) {
+	if (!base) return nullptr;
+	auto next = std::make_shared<Loop>(*base);
+	next->pattern = std::make_shared<const Pattern>(std::move(p));
+	if (publishOnly) publish(next);
+	else commitEdit(base, next, name);
+	return next;
 }
 
 void Spools::ensurePattern() {
 	auto l = loop();
-	if (!l || l->slices.empty() || (pattern() && patternSource == l->source)) return;
-	patternSource = l->source;
-	patterns.publish(std::make_shared<const Pattern>(initFromLoop(*l)));
+	if (!l || l->slices.empty() || l->pattern) return;
+	auto next = std::make_shared<Loop>(*l);
+	next->pattern = std::make_shared<const Pattern>(initFromLoop(*l));
+	exchange.replace(l, next);  // derived, like the features: no undo step
 }
 
 void Spools::onSave(const SaveEvent& e) {
@@ -391,6 +405,7 @@ void Spools::onSave(const SaveEvent& e) {
 	meta.meterNum = uint16_t(l->meterNum);
 	meta.meterDen = uint16_t(l->meterDen);
 	for (auto& s : l->slices) meta.cues.push_back({uint32_t(s.start), ""});
+	meta.spls = splsChunk(*l);
 	auto bytes = writeWav(*l->audio, meta, SampleFormat::Float32);
 	if (spools::writeFile(path, bytes.data(), bytes.size())) savedGeneration = generation;
 }
@@ -429,6 +444,88 @@ void sliceParamsFromJson(json_t* j, SliceParams& p) {
 	p.pingPong = json_is_true(json_object_get(j, "pingPong"));
 	p.reverse = json_is_true(json_object_get(j, "reverse"));
 	if (json_t* t = json_object_get(j, "tail")) p.tail = TailMode(clamp(int(json_integer_value(t)), 0, int(TailMode::Stretch)));
+}
+
+json_t* patternToJson(const Pattern& p) {
+	json_t* j = json_object();
+	json_object_set_new(j, "loopStart", json_integer(p.loopStart));
+	json_object_set_new(j, "loopEnd", json_integer(p.loopEnd));
+	json_object_set_new(j, "loopCount", json_integer(p.loopCount));
+	json_object_set_new(j, "direction", json_integer(int(p.direction)));
+	json_t* steps = json_array();
+	const PatternStep def;
+	for (const PatternStep& st : p.steps) {
+		json_t* js = json_object();
+		json_object_set_new(js, "slice", json_integer(st.slice));
+		json_object_set_new(js, "ticks", json_integer(st.ticks));
+		auto num = [&](const char* k, float v, float d) { if (v != d) json_object_set_new(js, k, json_real(v)); };
+		num("nudge", st.nudge, def.nudge);
+		num("duration", st.duration, def.duration);
+		num("pitch", st.pitch, def.pitch);
+		num("ratchetCurve", st.ratchetCurve, def.ratchetCurve);
+		num("velocity", st.velocity, def.velocity);
+		num("velocityRamp", st.velocityRamp, def.velocityRamp);
+		if (st.ratchets != 1) json_object_set_new(js, "ratchets", json_integer(st.ratchets));
+		if (st.reverse) json_object_set_new(js, "reverse", json_true());
+		json_array_append_new(steps, js);
+	}
+	json_object_set_new(j, "steps", steps);
+	return j;
+}
+
+Pattern patternFromJson(json_t* j) {
+	Pattern p;
+	auto integer = [](json_t* o, const char* k, int d) { json_t* x = json_object_get(o, k); return x ? int(json_integer_value(x)) : d; };
+	p.loopStart = std::max(0, integer(j, "loopStart", 0));
+	p.loopEnd = std::max(-1, integer(j, "loopEnd", -1));
+	p.loopCount = clamp(integer(j, "loopCount", 0), 0, 64);
+	p.direction = Direction(clamp(integer(j, "direction", 0), 0, 3));
+	size_t i;
+	json_t* js;
+	json_array_foreach(json_object_get(j, "steps"), i, js) {
+		if (i >= 64) break;
+		PatternStep st;
+		auto num = [&](const char* k, float& v, float lo, float hi) { if (json_t* x = json_object_get(js, k)) v = clamp(float(json_number_value(x)), lo, hi); };
+		st.slice = std::max(-1, integer(js, "slice", 0));
+		st.ticks = clamp(integer(js, "ticks", 4), 1, 32);
+		num("nudge", st.nudge, -1, 1);
+		num("duration", st.duration, 0.05f, 1);
+		num("pitch", st.pitch, -48, 48);
+		num("ratchetCurve", st.ratchetCurve, -1, 1);
+		num("velocity", st.velocity, 0, 1);
+		num("velocityRamp", st.velocityRamp, -1, 1);
+		st.ratchets = clamp(integer(js, "ratchets", 1), 1, 8);
+		st.reverse = json_is_true(json_object_get(js, "reverse"));
+		p.steps.push_back(st);
+	}
+	return p;
+}
+
+std::string splsChunk(const Loop& l) {
+	json_t* root = json_object();
+	json_object_set_new(root, "version", json_integer(1));
+	json_t* slices = json_array();
+	for (auto& s : l.slices) json_array_append_new(slices, sliceParamsToJson(s.p));
+	json_object_set_new(root, "slices", slices);
+	if (l.pattern) json_object_set_new(root, "pattern", patternToJson(*l.pattern));
+	char* text = json_dumps(root, JSON_COMPACT);
+	std::string out = text ? text : "";
+	free(text);
+	json_decref(root);
+	return out;
+}
+
+void applySpls(Loop& l) {
+	if (l.spls.empty()) return;
+	json_error_t err;
+	json_t* root = json_loads(l.spls.c_str(), 0, &err);
+	if (!root) return;
+	size_t i;
+	json_t* js;
+	json_array_foreach(json_object_get(root, "slices"), i, js)
+		if (i < l.slices.size()) sliceParamsFromJson(js, l.slices[i].p);
+	if (json_t* p = json_object_get(root, "pattern")) l.pattern = std::make_shared<const Pattern>(patternFromJson(p));
+	json_decref(root);
 }
 
 json_t* Spools::dataToJson() {
@@ -472,6 +569,7 @@ json_t* Spools::dataToJson() {
 		json_array_append_new(slices, js);
 	}
 	json_object_set_new(j, "slices", slices);
+	if (l->pattern) json_object_set_new(j, "pattern", patternToJson(*l->pattern));
 	json_object_set_new(root, "loop", j);
 	return root;
 }
@@ -517,6 +615,7 @@ void Spools::dataFromJson(json_t* root) {
 		sliceParamsFromJson(js, s.p);
 		saved->slices.push_back(s);
 	}
+	if (json_t* p = json_object_get(j, "pattern")) saved->pattern = std::make_shared<const Pattern>(patternFromJson(p));
 	json_t* path = json_object_get(j, "path");
 	load(path ? json_string_value(path) : "", saved);
 	savedGeneration = generation + 1;  // the embedded file on disk already matches what we are loading

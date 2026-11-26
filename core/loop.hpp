@@ -58,6 +58,8 @@ struct CropSpec {
 	Range resolve(const Audio& source, double bpm) const;
 };
 
+struct Pattern;
+
 struct Loop {
 	std::shared_ptr<const Audio> source;  // whole decoded file
 	Range crop;                           // into source
@@ -72,6 +74,8 @@ struct Loop {
 	std::shared_ptr<const WaveformMips> mips;  // shared by slice edits of the same crop
 	std::shared_ptr<const OnsetEnvelope> onsets;  // cached analysis of `audio`, or null
 	std::shared_ptr<const std::vector<SliceFeatures>> features;  // one per slice, or null until analysed
+	std::shared_ptr<const Pattern> pattern;  // Pattern mode's slice remap, or null until made from the slices
+	std::string spls;                        // Spools' own WAV chunk as loaded (JSON), applied by the module
 
 	size_t sliceEnd(size_t i) const { return i + 1 < slices.size() ? slices[i + 1].start : audio->frames; }
 	double beats() const { return audio->seconds() * bpm / 60.0; }

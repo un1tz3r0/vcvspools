@@ -15,17 +15,22 @@ adds. Licensed GPL-3.0-or-later.
 - Tail modes fit each slice to its time: Ring, Cut, Loop (manual points,
   crossfade or ping-pong), Auto-loop (searched, pitch-period loops) and
   granular Stretch at the original pitch.
+- Pattern mode re-chops the loop: up to 64 steps of any slice or rest, with
+  lengths, nudge, ratchet rolls, velocity ramps, reverse and pitch.
 - A display with LOOP (slice editing, crop), SLICE (one slice up close, loop
-  points, per-slice fields) and SETTINGS pages; every edit can be undone.
+  points, per-slice fields), PATTERN and SETTINGS pages; every edit can be
+  undone.
 
 The [manual](docs/manual.md) covers all of it.
 [DESIGN.md](DESIGN.md) is the plan, [TODO.md](TODO.md) tracks progress, and
 [docs/development.md](docs/development.md) has the code layout, tests and
 benchmarks.
 
-| LOOP | SLICE | SETTINGS |
-|---|---|---|
-| ![LOOP page](docs/images/page-loop.png) | ![SLICE page](docs/images/page-slice.png) | ![SETTINGS page](docs/images/page-settings.png) |
+| LOOP | SLICE |
+|---|---|
+| ![LOOP page](docs/images/page-loop.png) | ![SLICE page](docs/images/page-slice.png) |
+| **PATTERN** | **SETTINGS** |
+| ![PATTERN page](docs/images/page-pattern.png) | ![SETTINGS page](docs/images/page-settings.png) |
 
 The images are 100%-scale previews rendered from the layout code, not Rack
 screenshots yet.

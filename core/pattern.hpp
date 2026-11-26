@@ -37,6 +37,13 @@ struct Pattern {
 // add up to the region's length).
 Pattern initFromLoop(const Loop& loop);
 
+// Menu actions. Shuffle permutes which slice each step plays, keeping the rhythm; reverse flips the step order.
+Pattern shuffled(const Pattern& p, uint32_t seed);
+Pattern reversed(const Pattern& p);
+Pattern withStepInserted(const Pattern& p, size_t at, const PatternStep& s);  // at most 64 steps
+Pattern withStepRemoved(const Pattern& p, size_t at);                         // keeps at least one
+constexpr size_t kMaxPatternSteps = 64;
+
 // Pattern-mode sequencer: like LoopSequencer, positioned from the transport's loop beat. V/oct shifts the slice
 // of every step; direction reorders the steps of each pass (random picks a step's content for each slot).
 class PatternSequencer {
@@ -44,6 +51,7 @@ public:
 	SeqEvent process(double loopBeat, bool running, bool restart, int semitones, const Loop& loop, const Pattern& pattern);
 	void reset() { active = false; pass = -1; slot = -1; hit = -1; }
 	void seed(uint32_t s) { rng = s ? s : 1; }
+	int currentStep() const { return active ? content : -1; }
 
 private:
 	bool active = false, finished = false;

@@ -18,6 +18,7 @@ Spools is a loop player and slicer for VCV Rack 2. It plays REX2, Acidized WAV a
   - **SLICE**: a close-up of the selected slice (the first one, when several are selected; the playing one when none is). The ‹ › buttons in the tab row step through the slices. It shows the trims, the transient end (dotted line, `T`) and the loop region in amber, faint while automatic and bright once set by hand. Below are the slice's own settings: Pitch, Gain, Pan, Cutoff, Res and Xfade (drag up or down, Shift for fine, double-click to reset), and Reverse, Tail, Loop (Forward or Pingpong) and Points (Auto or Manual), which open a menu when clicked.
 
     ![SLICE page](images/page-slice.png)
+  - **PATTERN**: the slice-remap pattern for Pattern mode (see [Transport](#transport)).
   - **SETTINGS**: every global option: mode, direction, tail, stretch attack and tail amounts, loop crossfade, loop count, envelope retrigger, slicing, clock resolution, bar length, bars per cycle, interpolation quality and audio embedding. Click a row to pick a value. The same options are also in the right-click menu, grouped as Playback, Slicing, Transport and Engine.
 - **Tone strip** (the shaded band under the display): FILTER type (off, low-pass 12 dB, band-pass, high-pass 12 dB, notch, low-pass 24 dB), CUTOFF and RES, each with a CV-amount knob and a CV jack. Cutoff CV is 1 V/oct at 100%; resonance CV is 10 V = 100%. F.ENV sets how far the filter envelope moves the cutoff (±5 octaves). Then come the FILTER ENV and AMP ENV attack, decay, sustain and release knobs (0 to 10 s, exponential).
 - **Main row**: SLICE (start slice), LENGTH, trim IN/OUT, PITCH, LEVEL, XFADE (overlap), DUR (gate length in Cut mode), QUANT (launch quantize), BPM. Each knob with a CV jack has a small CV-amount knob above the jack.
@@ -54,7 +55,21 @@ While slices are selected, IN, OUT, PITCH, LEVEL, XFADE, CUTOFF and RES edit tho
 
 Set **Mode** to *Loop* on the SETTINGS page plays the region continuously on the clock instead of on gates; the display header shows LOOP. It starts at the SLICE knob's slice and keeps each slice's own timing, so it stays in step with the bar however the clock moves. **Direction** and **Loop count** work per pass through the region (loop count 0 = forever). GATE is ignored. V/OCT shifts which slice sounds in each slot by one slice per semitone, for beat-repeat and re-chop effects; each poly V/OCT channel runs its own copy.
 
-Set **Mode** to *Pattern* plays a slice-remap pattern on the same transport, for re-chopping. A pattern is a list of steps. Each step names a slice (or a rest), its length on a 1/32-note grid, a nudge (up to a tick early or late, without moving the grid), a gate length, reverse and a pitch offset. A step can also *ratchet*: play its slice 1–8 times within the step, evenly or as a roll that speeds up or slows down (the ratchet curve), with a velocity for the first hit and a ramp that raises or lowers the following ones. When you load a file, the pattern starts as the loop itself, one step per slice of the region, so it sounds like loop mode until you edit it. V/OCT shifts the slice of every step, the pattern's direction reverses or shuffles its steps per pass, and its loop range and count work like loop mode's. The pattern editor comes with the next release.
+Set **Mode** to *Pattern* plays a slice-remap pattern on the same transport, for re-chopping. A pattern is a list of steps. Each step names a slice (or a rest), its length on a 1/32-note grid, a nudge (up to a tick early or late, without moving the grid), a gate length, reverse and a pitch offset. A step can also *ratchet*: play its slice 1–8 times within the step, evenly or as a roll that speeds up or slows down (the ratchet curve), with a velocity for the first hit and a ramp that raises or lowers the following ones. When you load a file, the pattern starts as the loop itself, one step per slice of the region, so it sounds like loop mode until you edit it. V/OCT shifts the slice of every step, the pattern's direction reverses or shuffles its steps per pass, and its loop range and count work like loop mode's.
+
+The **PATTERN** page edits it. Steps are blocks along the page, as wide as their length and tinted with their slice's colour (grey for rests, brighter for higher velocity; ratchet hits are notched along the bottom). The amber bracket is the play range.
+
+- Click a step to select it; its settings appear below.
+- Drag a step up or down to change its slice; below the first slice is a rest. Alt-drag sets its velocity.
+- Drag a step's right edge to change its length, on the 1/32 grid.
+- Scroll over a step to change its ratchets.
+- Drag the bracket's tabs to set the play range.
+- Double-click a step to duplicate it, Ctrl-double-click to delete it, or double-click past the last step to add a rest.
+- The fields work like the SLICE page's: drag a number (Shift for fine), double-click to reset, click Reverse to toggle.
+
+Right-click → **Pattern** has **Init from loop** (one step per slice again), **Shuffle slices** (new slice order, same rhythm), **Reverse steps**, **Add rest at end**, **Delete selected step**, **Play every step**, **Direction** and **Loop count**. Every edit can be undone. The pattern is saved with the patch and in the embedded audio's `spls` chunk. Changing the slicing (re-slice, slice evenly, crop) makes a fresh pattern from the new slices.
+
+![PATTERN page](images/page-pattern.png)
 
 RUN, CONT and BAR drive loop mode. RUN is a gate: high runs the loop, and its rising edge restarts it at the start slice. Unpatched means always running. CONT restarts at the start slice on the next clock pulse (at once with no clock). BAR realigns the bar count without moving the playback position. The SETTINGS page (or right-click → **Transport**) sets the **Bar length** (from the loop's meter by default) and **Bars per cycle**, which restarts the loop automatically every N bars (∞ = only on CONT).
 
