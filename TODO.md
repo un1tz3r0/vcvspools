@@ -29,9 +29,9 @@ Each top-level item is a minor version (`2.N.0`) and one PR to `main`. Each seco
   - [x] 2.4.2 Amp and filter ADSR, bipolar amount, per-slice/per-note retrigger, AMP/FILT ENV outputs
   - [x] 2.4.3 Global + CV×attenuverter + per-slice parameter resolution, smoothing of continuous params
 
-- [ ] **2.5 Loop mode and transport**
+- [x] **2.5 Loop mode and transport**
   - [x] 2.5.1 RUN, CONT, BAR inputs; bar length; bars per cycle with automatic CONT
-  - [ ] 2.5.2 Loop-mode transport voice with direction/count and V/oct slice offset
+  - [x] 2.5.2 Loop-mode transport voice with direction/count and V/oct slice offset
 
 - [ ] **2.6 Panel and display**
   - [ ] 2.6.1 Final 36 HP panel SVG and control layout

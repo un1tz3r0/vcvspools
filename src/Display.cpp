@@ -55,6 +55,7 @@ void SpoolsDisplay::drawLayer(const DrawArgs& args, int layer) {
 	std::string info = string::f("%.1f BPM%s   %zu slice%s   %.2f s", module->currentBpm.load(), loop->bpmKnown ? "" : "?",
 		n, n == 1 ? "" : "s", a.seconds());
 	if (loop->origin == Origin::Rex) info = "REX (unofficial)   " + info;
+	if (module->playMode == Spools::kLoopMode) info = "LOOP   " + info;
 	text(vg, w - kPad, 16, NVG_ALIGN_RIGHT | NVG_ALIGN_BASELINE, 13, kDim, info);
 	std::string err = module->getStatus();
 	if (!err.empty()) text(vg, w / 2, 16, NVG_ALIGN_CENTER | NVG_ALIGN_BASELINE, 12, kText, "⚠ " + err);

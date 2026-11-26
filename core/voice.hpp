@@ -38,8 +38,11 @@ struct VoiceOut {
 // while the previous one fades out underneath it.
 class Voice {
 public:
+	// Note mode: runs this voice's own phrase sequencer.
 	VoiceOut process(double beat, double beatPeriod, bool gate, bool rising, int semitones,
 		const Loop& loop, const PhraseParams& phrase, const VoiceParams& vp, float engineRate);
+	// Any mode: plays what a sequencer decided for this sample.
+	VoiceOut play(const SeqEvent& e, double beatPeriod, const Loop& loop, const VoiceParams& vp, float engineRate);
 	void reset();
 	const SlicePlayer& player() const { return players[cur]; }
 

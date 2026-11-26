@@ -57,4 +57,21 @@ private:
 	SeqEvent startSlice(double at, const Loop& loop, const PhraseParams& p, bool phraseStart);
 };
 
+// Loop-mode sequencer (DESIGN §6.3): plays the region continuously from the start slice, positioned
+// directly from the transport's loop beat, so CONT/BAR jumps and tempo changes never drift. Each pass keeps the
+// region's own slot timing; direction and the V/oct offset only choose which slice sounds in each slot.
+class LoopSequencer {
+public:
+	SeqEvent process(double loopBeat, bool running, bool restart, int semitones, const Loop& loop, const PhraseParams& p);
+	void reset() { active = false; pass = -1; step = -1; }
+	void seed(uint32_t s) { rng = s ? s : 1; }
+	int currentSlice() const { return slice; }
+
+private:
+	bool active = false, finished = false;
+	long pass = -1;
+	int step = -1, slice = -1;
+	uint32_t rng = 0x9E3779B9u;
+};
+
 }

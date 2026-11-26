@@ -56,11 +56,15 @@ void Voice::begin(int slice, bool phraseStart, double slotSeconds, const Loop& l
 
 VoiceOut Voice::process(double beat, double beatPeriod, bool gate, bool rising, int semis,
 	const Loop& l, const PhraseParams& phrase, const VoiceParams& vp, float engineRate) {
-	VoiceOut out;
 	if (loop && loop != &l) reset();  // loop replaced: drop players that point at the old audio
+	return play(seq.process(beat, gate, rising, semis, l, phrase), beatPeriod, l, vp, engineRate);
+}
+
+VoiceOut Voice::play(const SeqEvent& e, double beatPeriod, const Loop& l, const VoiceParams& vp, float engineRate) {
+	VoiceOut out;
+	if (loop && loop != &l) reset();
 	loop = &l;
 
-	SeqEvent e = seq.process(beat, gate, rising, semis, l, phrase);
 	if (e.slice >= 0) {
 		begin(e.slice, e.phraseStart, e.sliceBeats * beatPeriod, l, vp, engineRate);
 		out.trig = true;

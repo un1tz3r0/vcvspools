@@ -31,7 +31,9 @@ Spools is an early proof of concept. See `DESIGN.md` for the planned behaviour a
 
 ## Transport
 
-RUN, CONT and BAR drive loop mode (next release). RUN is a gate: high runs the loop, and its rising edge restarts it at the start slice. Unpatched means always running. CONT restarts at the start slice on the next clock pulse (at once with no clock). BAR realigns the bar count without moving the playback position. Right-click → **Transport** sets the **Bar length** (from the loop's meter by default) and **Bars per cycle**, which restarts the loop automatically every N bars (∞ = only on CONT).
+Right-click → **Mode** → *Loop* plays the region continuously on the clock instead of on gates; the display header shows LOOP. It starts at the SLICE knob's slice and keeps each slice's own timing, so it stays in step with the bar however the clock moves. **Direction** and **Loop count** work per pass through the region (loop count 0 = forever). GATE is ignored. V/OCT shifts which slice sounds in each slot by one slice per semitone, for beat-repeat and re-chop effects; each poly V/OCT channel runs its own copy.
+
+RUN, CONT and BAR drive loop mode. RUN is a gate: high runs the loop, and its rising edge restarts it at the start slice. Unpatched means always running. CONT restarts at the start slice on the next clock pulse (at once with no clock). BAR realigns the bar count without moving the playback position. Right-click → **Transport** sets the **Bar length** (from the loop's meter by default) and **Bars per cycle**, which restarts the loop automatically every N bars (∞ = only on CONT).
 
 Right-click → **Playback** holds **Direction**, **Tail** (Ring/Cut) and **Loop count**. Until the display's Settings page arrives they live there instead of on the panel.
 

@@ -139,3 +139,65 @@ TEST_CASE("retrigger restarts the phrase; tempo is the caller's beat rate") {
 	}
 	CHECK(got == std::vector<int>{0, 1, 2, 5, 6, 7, 0});
 }
+
+static std::vector<Hit> runLoop(LoopSequencer& s, const Loop& loop, const PhraseParams& p, double from, double until,
+	int semis = 0, double restartAt = -1) {
+	std::vector<Hit> hits;
+	for (int i = int(from * 100); i <= int(until * 100); i++) {
+		double b = i / 100.0;
+		bool restart = i == int(from * 100) || (restartAt >= 0 && i == int(restartAt * 100));
+		double origin = restartAt >= 0 && b >= restartAt ? restartAt : from;
+		SeqEvent e = s.process(b - origin, true, restart, semis, loop, p);
+		if (e.slice >= 0 || e.endOfPhrase || e.release) hits.push_back({b, e});
+	}
+	return hits;
+}
+
+TEST_CASE("loop mode plays the region from the start slice, one slot per slice beat") {
+	auto loop = eightBeats();
+	PhraseParams p;
+	p.startSlice = 2;
+	p.regionStart = 1;
+	p.regionEnd = 5;
+	LoopSequencer s;
+	auto h = runLoop(s, *loop, p, 0, 9.5);
+	CHECK(slices(h) == std::vector<int>{2, 3, 4, 5, 1, 2, 3, 4, 5, 1});
+	CHECK(h[0].e.phraseStart);
+	CHECK_FALSE(h[1].e.phraseStart);
+	for (size_t i = 0; i < 10; i++) CHECK(h[i].beat == doctest::Approx(double(i)));
+	int eocs = 0;
+	for (auto& x : h) eocs += x.e.endOfPhrase;
+	CHECK(eocs == 1);  // pass boundary at beat 5
+}
+
+TEST_CASE("loop mode: V/oct offsets the slice but keeps the slot timing; direction and count apply per pass") {
+	auto loop = eightBeats();
+	PhraseParams p;
+	p.regionStart = 0;
+	p.regionEnd = 3;
+	LoopSequencer s;
+	CHECK(slices(runLoop(s, *loop, p, 0, 3.5, -1)) == std::vector<int>{3, 0, 1, 2});
+
+	p.direction = Direction::PingPong;
+	LoopSequencer pp;
+	CHECK(slices(runLoop(pp, *loop, p, 0, 7.5)) == std::vector<int>{0, 1, 2, 3, 3, 2, 1, 0});
+
+	p.direction = Direction::Forward;
+	p.loopCount = 2;
+	LoopSequencer c;
+	auto h = runLoop(c, *loop, p, 0, 12);
+	CHECK(slices(h).size() == 8);
+	CHECK(h.back().e.release);
+	CHECK(h.back().beat == doctest::Approx(8));
+}
+
+TEST_CASE("loop mode: a restart (CONT) jumps back to the start slice mid-slot") {
+	auto loop = eightBeats();
+	PhraseParams p;
+	p.startSlice = 4;
+	LoopSequencer s;
+	auto h = runLoop(s, *loop, p, 0, 4.0, 0, 2.5);
+	CHECK(slices(h) == std::vector<int>{4, 5, 6, 4, 5});
+	CHECK(h[3].beat == doctest::Approx(2.5));
+	CHECK(h[3].e.phraseStart);
+}

@@ -263,6 +263,8 @@ struct SpoolsWidget : ModuleWidget {
 		menu->addChild(createIndexSubmenuItem("Clock resolution", labels,
 			[=] { return size_t(std::find(ppqns.begin(), ppqns.end(), m->ppqn.load()) - ppqns.begin()); },
 			[=](size_t i) { m->ppqn = ppqns[i]; }));
+		menu->addChild(createIndexSubmenuItem("Mode", {"Note (V/oct + gate)", "Loop (transport)"},
+			[=] { return size_t(m->playMode.load()); }, [=](size_t i) { m->playMode = int(i); }));
 		menu->addChild(createSubmenuItem("Playback", "", [=](Menu* sub) { playbackMenu(sub, m); }));
 		menu->addChild(createSubmenuItem("Transport", "", [=](Menu* sub) { transportMenu(sub, m); }));
 		menu->addChild(createIndexSubmenuItem("Envelope retrigger", {"Each slice", "Each note"},

@@ -2,6 +2,12 @@
 
 Versions follow `TODO.md`: each `2.N.p` heading is one task, and the last one in a milestone is the released version.
 
+## 2.5.2
+
+- Loop mode (right-click → **Mode**): the region plays continuously from the start slice, positioned straight from the transport's loop beat, so CONT, BAR and tempo changes never drift. Direction and loop count apply per pass, and the slot timing always follows the region's own slices.
+- V/oct in loop mode offsets which slice sounds in each slot (wrapping in the region). Each poly V/OCT channel is a separate transport voice. GATE is ignored.
+- `Voice::play` takes events from either sequencer. Switching modes silences all voices. The display header shows LOOP in loop mode.
+
 ## 2.5.1
 
 - Loop transport (`core/transport.hpp`): RUN gate (unpatched = running, rising edge restarts), CONT (restarts on the next clock edge, or at once when free-running), BAR (realigns the bar phase only), and an automatic CONT every *bars per cycle* bars at exact bar multiples.
