@@ -28,6 +28,11 @@ DisplayContext SpoolsDisplay::context(NVGcontext* vg) {
 
 float SpoolsDisplay::tabRight(int i) const { return kPad + kTabW * float(i + 1); }
 
+math::Rect SpoolsDisplay::toolbar() const {
+	float x = tabRight(int(pages.size()) - 1) + 8;
+	return math::Rect(Vec(x, 0), Vec(box.size.x - kPad - x, kTabH));
+}
+
 void SpoolsDisplay::drawLayer(const DrawArgs& args, int layer) {
 	if (layer != 1) return OpaqueWidget::drawLayer(args, layer);
 	NVGcontext* vg = args.vg;
@@ -53,6 +58,7 @@ void SpoolsDisplay::drawLayer(const DrawArgs& args, int layer) {
 		ctx.text(x + (kTabW - 4) / 2, 16, NVG_ALIGN_CENTER | NVG_ALIGN_BASELINE, kReadout, i == cur ? kText : kDim, pages[i]->title());
 	}
 
+	pages[cur]->drawToolbar(ctx, toolbar());
 	nvgSave(vg);
 	nvgScissor(vg, ctx.area.pos.x, ctx.area.pos.y, ctx.area.size.x, ctx.area.size.y);
 	pages[cur]->draw(ctx);
@@ -67,6 +73,7 @@ void SpoolsDisplay::onButton(const ButtonEvent& e) {
 		if (e.action == GLFW_PRESS && e.button == GLFW_MOUSE_BUTTON_LEFT)
 			for (int i = 0; i < int(pages.size()); i++)
 				if (e.pos.x >= tabRight(i) - kTabW && e.pos.x < tabRight(i)) current() = i;
+		if (e.action == GLFW_PRESS && e.button == GLFW_MOUSE_BUTTON_LEFT) pages[current()]->onToolbarButton(context(), toolbar(), e.pos);
 		return;
 	}
 	DisplayContext ctx = context();

@@ -46,12 +46,122 @@ constexpr float kGrab = 4;       // px either side of a boundary that picks it u
 constexpr float kHandleBand = 9; // px at the top (region) and bottom (trims) of the waveform that hold handles
 
 struct LoopPage : Page {
-	enum class Drag { None, Boundary, RegionStart, RegionEnd, TrimStart, TrimEnd, Scroll };
+	enum class Drag { None, Boundary, RegionStart, RegionEnd, TrimStart, TrimEnd, Scroll, CropStart, CropEnd, CropMove };
 	Drag drag = Drag::None;
 	size_t dragIndex = 0;
 	std::shared_ptr<const Loop> dragBase, dragResult;
 	float scrollAnchor = 0;
 	float regionBefore[2] = {};
+
+	// Crop view: the whole source file, the crop as a bright window with handles. Edits preview here and
+	// apply (re-slicing plain audio) when the mouse is released.
+	std::shared_ptr<const Audio> mipsSource;
+	WaveformMips sourceMips;
+	Range cropPreview{0, 0};
+	bool previewing = false;
+	double grabOffset = 0;
+
+	const WaveformMips& mipsOf(const Loop& l) {
+		if (mipsSource != l.source) {
+			sourceMips = WaveformMips();
+			sourceMips.build(*l.source);
+			mipsSource = l.source;
+		}
+		return sourceMips;
+	}
+
+	static math::Rect cropButton(math::Rect bar) { return math::Rect(Vec(bar.pos.x + bar.size.x - 64, 3), Vec(64, kTabH - 6)); }
+
+	void drawToolbar(const DisplayContext& ctx, math::Rect bar) override {
+		if (!ctx.module || !ctx.loop) return;
+		math::Rect r = cropButton(bar);
+		const bool on = ctx.module->cropView;
+		nvgBeginPath(ctx.vg);
+		nvgRoundedRect(ctx.vg, r.pos.x + 0.5f, r.pos.y + 0.5f, r.size.x - 1, r.size.y - 1, 3);
+		if (on) { nvgFillColor(ctx.vg, kAccent); nvgFill(ctx.vg); }
+		nvgStrokeColor(ctx.vg, on ? kAccent : kDim);
+		nvgStrokeWidth(ctx.vg, 1);
+		nvgStroke(ctx.vg);
+		ctx.text(r.pos.x + r.size.x / 2, r.pos.y + 12, NVG_ALIGN_CENTER | NVG_ALIGN_BASELINE, kBody, on ? kBg : kText, "CROP");
+	}
+
+	bool onToolbarButton(const DisplayContext& ctx, math::Rect bar, Vec pos) override {
+		if (!ctx.module || !ctx.loop || !cropButton(bar).contains(pos)) return false;
+		ctx.module->cropView = !ctx.module->cropView;
+		return true;
+	}
+
+	Range shownCrop(const Loop& l) const { return previewing ? cropPreview : l.crop; }
+
+	void drawCrop(const DisplayContext& ctx) {
+		const Loop& l = *ctx.loop;
+		const Audio& src = *l.source;
+		const WaveformMips& mips = mipsOf(l);
+		const float ax = ctx.area.pos.x, ay = ctx.area.pos.y, h = ctx.area.size.y;
+		const float top = ay + kHeader, bottom = ay + h - kFooter, mid = (top + bottom) / 2, amp = (bottom - top) / 2 - 2;
+		const float x0 = ax + kPad, x1 = ax + ctx.area.size.x - kPad;
+		auto fx = [&](double f) { return x0 + float(f / double(src.frames)) * (x1 - x0); };
+		const Range c = shownCrop(l);
+		const double sr = src.sampleRate;
+
+		ctx.text(x0, ay + 15, NVG_ALIGN_LEFT | NVG_ALIGN_BASELINE, kReadout, kText,
+			string::f("Crop %.3f – %.3f s  (%.3f s of %.2f s)", c.start / sr, c.end / sr, c.length() / sr, src.seconds()));
+
+		const float ca = fx(double(c.start)), cb = fx(double(c.end));
+		ctx.fillRect(ca, top, cb - ca, bottom - top, nvgRGBA(0xff, 0xc8, 0x57, 0x18));
+		for (float x = x0; x < x1; x += 1.f) {
+			size_t f0 = size_t(double(x - x0) / (x1 - x0) * src.frames), f1 = std::max(f0 + 1, size_t(double(x + 1 - x0) / (x1 - x0) * src.frames));
+			float lo = 0, hi = 0;
+			for (int ch = 0; ch < src.channels; ch++) {
+				auto pk = mips.peak(ch, f0, f1, src);
+				lo = std::min(lo, pk.lo);
+				hi = std::max(hi, pk.hi);
+			}
+			const bool inside = x >= ca && x < cb;
+			ctx.fillRect(x, mid - clamp(hi, -1.f, 1.f) * amp, 1.f, std::max(1.f, (hi - lo) * amp), inside ? kText : nvgRGBA(0xa8, 0xa8, 0xae, 0x60));
+		}
+		if (!previewing)  // the slices belong to the current crop; hide them while it is being changed
+			for (auto& s : l.slices) ctx.fillRect(fx(double(s.start + l.crop.start)), top, 1, bottom - top, nvgRGBA(0xff, 0xff, 0xff, 0x40));
+		for (float x : {ca, cb}) {
+			ctx.fillRect(x - 1, top, 2, bottom - top, kAccent);
+			ctx.fillRect(x - 4, top, 8, 8, kAccent);
+		}
+		ctx.text(x0, bottom + 12, NVG_ALIGN_LEFT | NVG_ALIGN_BASELINE, 11, kDim, "0 s");
+		ctx.text(x1, bottom + 12, NVG_ALIGN_RIGHT | NVG_ALIGN_BASELINE, 11, kDim, string::f("%.2f s", src.seconds()));
+	}
+
+	double sourceFrame(const DisplayContext& ctx, const Loop& l, float px) const {
+		const float x0 = kPad, x1 = ctx.area.size.x - kPad;
+		return std::clamp(double(px - x0) / (x1 - x0), 0.0, 1.0) * double(l.source->frames);
+	}
+
+	bool cropButtonPress(const DisplayContext& ctx, Vec pos) {
+		const Loop& l = *ctx.loop;
+		const float x0 = kPad, x1 = ctx.area.size.x - kPad;
+		auto fx = [&](double f) { return x0 + float(f / double(l.source->frames)) * (x1 - x0); };
+		cropPreview = l.crop;
+		const double f = sourceFrame(ctx, l, pos.x);
+		if (std::fabs(pos.x - fx(double(l.crop.start))) <= kGrab * 2) drag = Drag::CropStart;
+		else if (std::fabs(pos.x - fx(double(l.crop.end))) <= kGrab * 2) drag = Drag::CropEnd;
+		else if (f > double(l.crop.start) && f < double(l.crop.end)) { drag = Drag::CropMove; grabOffset = f - double(l.crop.start); }
+		return true;
+	}
+
+	void cropDrag(const DisplayContext& ctx, Vec pos) {
+		const Loop& l = *dragBase;
+		const double f = sourceFrame(ctx, l, pos.x), total = double(l.source->frames);
+		const double minLen = 0.01 * l.source->sampleRate;
+		Range c = cropPreview;
+		if (drag == Drag::CropStart) c.start = size_t(std::clamp(f, 0.0, double(c.end) - minLen));
+		else if (drag == Drag::CropEnd) c.end = size_t(std::clamp(f, double(c.start) + minLen, total));
+		else {
+			const double len = double(l.crop.length());
+			c.start = size_t(std::clamp(f - grabOffset, 0.0, total - len));
+			c.end = c.start + l.crop.length();
+		}
+		cropPreview = c;
+		previewing = true;
+	}
 
 	const char* title() const override { return "LOOP"; }
 
@@ -93,6 +203,7 @@ struct LoopPage : Page {
 		Geometry g(ctx, l);
 		dragBase = dragResult = ctx.loop;
 		drag = Drag::None;
+		if (m->cropView) return e.button == GLFW_MOUSE_BUTTON_LEFT && cropButtonPress(ctx, pos);
 		if (e.button == GLFW_MOUSE_BUTTON_MIDDLE) { drag = Drag::Scroll; scrollAnchor = pos.x; return true; }
 		if (e.button != GLFW_MOUSE_BUTTON_LEFT) return false;
 
@@ -138,6 +249,11 @@ struct LoopPage : Page {
 		Geometry g(ctx, l);
 		const double f = g.frame(pos.x), sr = l.audio->sampleRate;
 		switch (drag) {
+			case Drag::CropStart:
+			case Drag::CropEnd:
+			case Drag::CropMove:
+				cropDrag(ctx, pos);
+				return true;
 			case Drag::Scroll: {
 				float dx = pos.x - scrollAnchor;
 				scrollAnchor = pos.x;
@@ -176,6 +292,9 @@ struct LoopPage : Page {
 	}
 
 	void onDragEnd(const DisplayContext& ctx) override {
+		if (ctx.module && previewing && dragBase && (cropPreview.start != dragBase->crop.start || cropPreview.end != dragBase->crop.end))
+			ctx.module->setCrop(cropPreview);
+		previewing = false;
 		if (ctx.module && dragResult != dragBase && (drag == Drag::Boundary || drag == Drag::TrimStart || drag == Drag::TrimEnd))
 			ctx.module->commitEdit(dragBase, dragResult, drag == Drag::Boundary ? "move slice" : "trim slice");
 		if (ctx.module && (drag == Drag::RegionStart || drag == Drag::RegionEnd)) {
@@ -198,7 +317,7 @@ struct LoopPage : Page {
 	// Double-click adds a slice; Ctrl-double-click on a boundary removes it.
 	void onDoubleClick(const DisplayContext& ctx, Vec pos) override {
 		Spools* m = ctx.module;
-		if (!m || !ctx.loop || pos.y < kHeader) return;
+		if (!m || !ctx.loop || pos.y < kHeader || m->cropView) return;
 		const Loop& l = *ctx.loop;
 		Geometry g(ctx, l);
 		if (APP->window->getMods() & RACK_MOD_CTRL) {
@@ -212,7 +331,7 @@ struct LoopPage : Page {
 	// Scroll zooms around the pointer.
 	bool onHoverScroll(const DisplayContext& ctx, Vec pos, const widget::Widget::HoverScrollEvent& e) override {
 		Spools* m = ctx.module;
-		if (!m || !ctx.loop || e.scrollDelta.y == 0) return false;
+		if (!m || !ctx.loop || e.scrollDelta.y == 0 || m->cropView) return false;
 		Geometry g(ctx, *ctx.loop);
 		float at = m->viewStart + (pos.x - g.x0) / (g.x1 - g.x0) * m->viewSpan;
 		float span = std::clamp(m->viewSpan * std::pow(0.85f, e.scrollDelta.y / 50.f), 0.002f, 1.f);
@@ -235,6 +354,7 @@ struct LoopPage : Page {
 			}
 			return;
 		}
+		if (module->cropView) return drawCrop(ctx);
 		const Audio& a = *loop->audio;
 		const size_t n = loop->slices.size();
 

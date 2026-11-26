@@ -2,6 +2,12 @@
 
 Versions follow `TODO.md`: each `2.N.p` heading is one task, and the last one in a milestone is the released version.
 
+## 2.6.6
+
+- Crop view: the **CROP** toggle in the LOOP page's toolbar (the tab row) shows the whole source file with the crop as a bright window. Drag either edge, or drag the window to slide it. The crop applies on release, and plain audio is re-sliced. The source waveform's mips are built once, the first time the view opens for a file.
+- Pages can put controls in the tab row (`drawToolbar`/`onToolbarButton`).
+- Slow edits (crop, re-slice, slice evenly, loop tempo) now run on the worker and land in Rack's undo history when they finish.
+
 ## 2.6.5
 
 - Selection editing: while slices are selected, IN, OUT, PITCH, LEVEL, XFADE, CUTOFF and RES show the selection's mean and edit its slices. Turning a knob moves every selected slice by the same amount, in the slice's own units (seconds, semitones, dB, octaves). Shift-click sets the selection to its mean, as one undo step. An amber ring shows the selection's spread.

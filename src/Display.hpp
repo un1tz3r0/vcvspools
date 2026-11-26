@@ -24,4 +24,5 @@ private:
 	int& current();
 	DisplayContext context(NVGcontext* vg = nullptr);
 	float tabRight(int i) const;
+	math::Rect toolbar() const;
 };

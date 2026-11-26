@@ -55,7 +55,9 @@ RUN, CONT and BAR drive loop mode. RUN is a gate: high runs the loop, and its ri
 
 ## Crop and tempo
 
-Right-click → **Crop** sets which part of the file plays. Type a start and a length and press Enter. A bare number uses the chosen **Units**; a suffix overrides it: `1.5 s`, `250 ms`, `4 b` (beats), `2 bars`, `1000 smp`. Leave the length empty to play to the end, or pick **Whole file**. Cropping plain audio slices it again; REX and Acidized files keep the slices inside the crop.
+Click **CROP** at the right of the tab row to see the whole file, with the cropped part bright between two amber handles. Drag a handle to move that edge, or drag inside the window to slide it. The new crop applies when you let go. Click **CROP** again to go back to the slices.
+
+Right-click → **Crop** sets the crop by typing. Type a start and a length and press Enter. A bare number uses the chosen **Units**; a suffix overrides it: `1.5 s`, `250 ms`, `4 b` (beats), `2 bars`, `1000 smp`. Leave the length empty to play to the end, or pick **Whole file**. Cropping plain audio slices it again; REX and Acidized files keep the slices inside the crop.
 
 Right-click → **Loop tempo** sets the loop's own tempo, which fixes where each slice sits in beats. Type a BPM, **Halve** or **Double** it, or click **Tap tempo** on each beat (the menu stays open). A detected tempo shows `?` on the display until you set one. The **BPM** knob is separate: it sets the playback tempo when no clock is patched.
 

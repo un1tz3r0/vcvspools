@@ -33,13 +33,13 @@ Each top-level item is a minor version (`2.N.0`) and one PR to `main`. Each seco
   - [x] 2.5.1 RUN, CONT, BAR inputs; bar length; bars per cycle with automatic CONT
   - [x] 2.5.2 Loop-mode transport voice with direction/count and V/oct slice offset
 
-- [ ] **2.6 Panel and display**
+- [x] **2.6 Panel and display**
   - [x] 2.6.1 Final 36 HP panel SVG and control layout
   - [x] 2.6.2 Page framework: tab row, `Page`/`DisplayContext`, Loop and Settings pages
   - [x] 2.6.3 Loop page drawing: OKLCH slice hues, grid, region, playheads, readouts, REX badge, light layer
   - [x] 2.6.4 Mouse editing: select/deselect/multi-select, drag boundaries and trims, add/delete slices, region handles, zoom/scroll, undo history
   - [x] 2.6.5 Selection editing: knob retargeting to the selection mean, relative multi-edit, shift-click = set to mean, spread ring
-  - [ ] 2.6.6 Crop view with handles
+  - [x] 2.6.6 Crop view with handles
 
 - [ ] **2.7 Tail modes**
   - [ ] 2.7.1 Per-slice features: transient end, YIN fundamental period with confidence

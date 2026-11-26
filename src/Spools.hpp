@@ -1,5 +1,6 @@
 #pragma once
 #include <atomic>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -75,6 +76,7 @@ struct Spools : Module {
 	// Display state (UI thread).
 	int displayPage = 0;
 	float viewStart = 0, viewSpan = 1;  // visible part of the loop, as fractions of its length
+	bool cropView = false;              // LOOP page shows the whole source file with crop handles
 	std::vector<size_t> selection;      // sorted slice indices
 	const spools::Loop* selectionOf = nullptr;
 	// The selection, emptied when the slice list it refers to has changed shape.
@@ -92,7 +94,14 @@ struct Spools : Module {
 	const spools::Loop* shownLoop = nullptr;
 	float shown[PARAMS_LEN] = {};
 	// Publishes an edited loop and records it for undo; `before` is what undo goes back to.
-	void commitEdit(std::shared_ptr<const spools::Loop> before, std::shared_ptr<const spools::Loop> after, const std::string& name);    // automatic CONT every N bars; 0 = never
+	void commitEdit(std::shared_ptr<const spools::Loop> before, std::shared_ptr<const spools::Loop> after, const std::string& name,
+		bool publishIt = true);
+	// Runs a slow edit (re-slice, crop, ...) on the worker; it becomes undoable once flushHistory() sees it.
+	void postEdit(const char* name, std::function<std::shared_ptr<spools::Loop>(const spools::Loop&)> edit);
+	void flushHistory();  // UI thread
+	struct FinishedEdit { const char* name; std::shared_ptr<const spools::Loop> before, after; };
+	std::mutex editsMutex;
+	std::vector<FinishedEdit> finishedEdits;    // automatic CONT every N bars; 0 = never
 	spools::SliceSettings slicing;  // UI thread only; workers get a copy
 	spools::CropSpec::Unit cropUnit = spools::CropSpec::Seconds;  // unit shown in the crop fields
 	spools::TapTempo tapTempo;

@@ -134,37 +134,50 @@ void Spools::load(const std::string& path, std::shared_ptr<SavedLoop> saved) {
 	});
 }
 
-void Spools::sliceEvenly(size_t count) {
+void Spools::postEdit(const char* name, std::function<std::shared_ptr<Loop>(const Loop&)> edit) {
 	auto cur = loop();
 	if (!cur) return;
-	worker->post([this, cur, count] { publish(spools::sliceEvenly(*cur, count)); });
+	worker->post([this, cur, name, edit] {
+		std::shared_ptr<const Loop> next = edit(*cur);
+		if (!next) return;
+		publish(next);
+		std::lock_guard<std::mutex> lock(editsMutex);
+		finishedEdits.push_back({name, cur, next});
+	});
+}
+
+void Spools::flushHistory() {
+	std::vector<FinishedEdit> done;
+	{
+		std::lock_guard<std::mutex> lock(editsMutex);
+		done.swap(finishedEdits);
+	}
+	for (auto& e : done) commitEdit(e.before, e.after, e.name, false);  // already published; this only records it
+}
+
+void Spools::sliceEvenly(size_t count) {
+	postEdit("slice evenly", [count](const Loop& l) { return spools::sliceEvenly(l, count); });
 }
 
 void Spools::reslice() {
-	auto cur = loop();
-	if (!cur) return;
-	worker->post([this, cur, s = slicing] {
-		auto l = autoSlice(*cur, s);
-		l->regionStart = std::min(cur->regionStart, l->slices.size() - 1);
-		l->regionEnd = std::min(std::max(cur->regionEnd, l->regionStart), l->slices.size() - 1);
-		publish(l);
+	postEdit("re-slice", [s = slicing](const Loop& cur) {
+		auto l = autoSlice(cur, s);
+		l->regionStart = std::min(cur.regionStart, l->slices.size() - 1);
+		l->regionEnd = std::min(std::max(cur.regionEnd, l->regionStart), l->slices.size() - 1);
+		return l;
 	});
 }
 
 void Spools::setCrop(Range crop) {
-	auto cur = loop();
-	if (!cur) return;
-	worker->post([this, cur, crop, s = slicing] {
-		auto l = recrop(*cur, crop);
-		if (l->origin == Origin::Plain) l = autoSlice(*l, s);
-		publish(l);
+	postEdit("crop", [crop, s = slicing](const Loop& cur) {
+		auto l = recrop(cur, crop);
+		return l->origin == Origin::Plain ? autoSlice(*l, s) : l;
 	});
 }
 
 void Spools::setLoopBpm(double bpm) {
-	auto cur = loop();
-	if (!cur || !(bpm > 0)) return;
-	worker->post([this, cur, bpm] { publish(retempo(*cur, bpm)); });
+	if (!(bpm > 0)) return;
+	postEdit("loop tempo", [bpm](const Loop& l) { return retempo(l, bpm); });
 }
 
 std::vector<size_t>& Spools::selected() {
@@ -186,10 +199,11 @@ struct LoopEditAction : history::ModuleAction {
 };
 }
 
-void Spools::commitEdit(std::shared_ptr<const Loop> before, std::shared_ptr<const Loop> after, const std::string& name) {
+void Spools::commitEdit(std::shared_ptr<const Loop> before, std::shared_ptr<const Loop> after, const std::string& name, bool publishIt) {
 	if (!after) return;
-	publish(after);
+	if (publishIt) publish(after);
 	if (!before || before == after) return;
+	if (!APP->history) return;
 	auto* h = new LoopEditAction;
 	h->moduleId = id;
 	h->name = name;

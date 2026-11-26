@@ -40,6 +40,9 @@ struct Page {
 	virtual bool onDragMove(const DisplayContext&, Vec, const widget::Widget::DragMoveEvent&) { return false; }
 	virtual bool onHoverScroll(const DisplayContext&, Vec, const widget::Widget::HoverScrollEvent&) { return false; }
 	virtual void onDragEnd(const DisplayContext&) {}
+	// Optional controls in the tab row, right of the tabs. `bar` is in display px.
+	virtual void drawToolbar(const DisplayContext&, math::Rect bar) {}
+	virtual bool onToolbarButton(const DisplayContext&, math::Rect bar, Vec pos) { return false; }
 	virtual void onDoubleClick(const DisplayContext&, Vec) {}
 };
 
