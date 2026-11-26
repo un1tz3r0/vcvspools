@@ -2,6 +2,12 @@
 
 Versions follow `TODO.md`: each `2.N.p` heading is one task, and the last one in a milestone is the released version.
 
+## 2.7.1
+
+- Per-slice features for the tail modes (`core/features.hpp`): the transient end (where the short-term level has fallen below half its peak and flattened) and a YIN fundamental-period estimate of the part after it, with a confidence value. In tests the period is within 0.5 % from 55 Hz to 1 kHz.
+- Features are computed on the worker whenever the slice list changes and stored with the loop. Slice edits that move boundaries clear them.
+- `Exchange::replace` publishes a derived result only if nothing newer was published in the meantime, so background analysis never overwrites an edit.
+
 ## 2.6.6
 
 - Crop view: the **CROP** toggle in the LOOP page's toolbar (the tab row) shows the whole source file with the crop as a bright window. Drag either edge, or drag the window to slide it. The crop applies on release, and plain audio is re-sliced. The source waveform's mips are built once, the first time the view opens for a file.

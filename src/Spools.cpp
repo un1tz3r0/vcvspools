@@ -155,6 +155,17 @@ void Spools::flushHistory() {
 	for (auto& e : done) commitEdit(e.before, e.after, e.name, false);  // already published; this only records it
 }
 
+void Spools::ensureFeatures() {
+	auto cur = loop();
+	if (!cur || cur->features || featuresFor == cur.get()) return;
+	featuresFor = cur.get();
+	worker->post([this, cur] {
+		auto l = std::make_shared<Loop>(*cur);
+		l->features = std::make_shared<const std::vector<SliceFeatures>>(analyzeSlices(*cur));
+		exchange.replace(cur, l);  // derived data only: no undo step, and dropped if an edit got there first
+	});
+}
+
 void Spools::sliceEvenly(size_t count) {
 	postEdit("slice evenly", [count](const Loop& l) { return spools::sliceEvenly(l, count); });
 }

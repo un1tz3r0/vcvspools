@@ -6,6 +6,7 @@ namespace spools {
 static std::shared_ptr<Loop> copyWithBeats(const Loop& old, std::vector<Slice> slices) {
 	auto l = std::make_shared<Loop>(old);
 	l->slices = std::move(slices);
+	l->features = nullptr;  // slice extents changed
 	for (auto& s : l->slices) s.beat = l->frameToBeat(s.start);
 	const size_t last = l->slices.size() - 1;
 	l->regionStart = std::min(l->regionStart, last);

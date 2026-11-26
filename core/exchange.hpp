@@ -47,6 +47,16 @@ public:
 	// Producer side.
 	void publish(std::shared_ptr<const T> next) {
 		std::lock_guard<std::mutex> lock(mutex);
+		publishLocked(std::move(next));
+	}
+	// Publishes only if nothing else was published since `expected`; for results derived from it.
+	bool replace(const std::shared_ptr<const T>& expected, std::shared_ptr<const T> next) {
+		std::lock_guard<std::mutex> lock(mutex);
+		if (newest != expected) return false;
+		publishLocked(std::move(next));
+		return true;
+	}
+	void publishLocked(std::shared_ptr<const T> next) {
 		collectLocked();
 		const T* raw = next.get();
 		if (raw) owned[raw] = next;

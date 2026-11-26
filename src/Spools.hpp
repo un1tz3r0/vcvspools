@@ -99,6 +99,9 @@ struct Spools : Module {
 	// Runs a slow edit (re-slice, crop, ...) on the worker; it becomes undoable once flushHistory() sees it.
 	void postEdit(const char* name, std::function<std::shared_ptr<spools::Loop>(const spools::Loop&)> edit);
 	void flushHistory();  // UI thread
+	// Analyses slices for the tail modes in the background whenever the slice list changes (UI thread).
+	void ensureFeatures();
+	const spools::Loop* featuresFor = nullptr;
 	struct FinishedEdit { const char* name; std::shared_ptr<const spools::Loop> before, after; };
 	std::mutex editsMutex;
 	std::vector<FinishedEdit> finishedEdits;    // automatic CONT every N bars; 0 = never

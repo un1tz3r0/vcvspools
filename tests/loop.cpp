@@ -174,3 +174,13 @@ TEST_CASE("retempo rescales slice beats and marks the tempo known") {
 	CHECK(r->beats() == doctest::Approx(2));
 	CHECK(l->slices[1].beat == doctest::Approx(1));  // original untouched
 }
+
+TEST_CASE("Exchange::replace only publishes over the expected object") {
+	Exchange<int> x;
+	auto a = std::make_shared<const int>(1), b = std::make_shared<const int>(2), c = std::make_shared<const int>(3);
+	x.publish(a);
+	CHECK(x.replace(a, b));
+	CHECK(*x.latest() == 2);
+	CHECK_FALSE(x.replace(a, c));  // b was published since
+	CHECK(*x.latest() == 2);
+}

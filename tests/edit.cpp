@@ -24,6 +24,7 @@ TEST_CASE("moving a boundary keeps neighbours a minimum length apart and recompu
 	CHECK(m->slices[1].p.pitch == 3);
 	CHECK(m->audio.get() == l->audio.get());
 	CHECK(m->mips.get() == l->mips.get());
+	CHECK_FALSE(bool(m->features));
 	CHECK(moveBoundary(*l, 1, 0)->slices[1].start == 240);       // 5 ms after slice 0
 	CHECK(moveBoundary(*l, 1, 30000)->slices[1].start == 23760);  // 5 ms before slice 2
 	CHECK(moveBoundary(*l, 0, 100)->slices[0].start == 0);
