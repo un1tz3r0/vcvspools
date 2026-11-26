@@ -1,8 +1,8 @@
 #include "Spools.hpp"
 #include <cmath>
-#include "file.hpp"
-#include "riff.hpp"
-#include "units.hpp"
+#include "core/file.hpp"
+#include "core/riff.hpp"
+#include "core/units.hpp"
 
 using namespace spools;
 

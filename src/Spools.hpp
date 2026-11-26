@@ -4,11 +4,11 @@
 #include <mutex>
 #include <string>
 #include "plugin.hpp"
-#include "exchange.hpp"
-#include "loop.hpp"
-#include "timebase.hpp"
-#include "voice.hpp"
-#include "worker.hpp"
+#include "core/exchange.hpp"
+#include "core/loop.hpp"
+#include "core/timebase.hpp"
+#include "core/voice.hpp"
+#include "core/worker.hpp"
 
 // Slice map and loop settings as saved in the patch, applied once the audio has loaded.
 struct SavedLoop {
