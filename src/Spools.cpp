@@ -20,7 +20,7 @@ struct EnvTimeQuantity : ParamQuantity {
 };
 
 const std::vector<TailChoice>& tailChoices() {
-	static const std::vector<TailChoice> choices = {{TailMode::Ring, "Ring"}, {TailMode::Cut, "Cut"}, {TailMode::Loop, "Loop"}};
+	static const std::vector<TailChoice> choices = {{TailMode::Ring, "Ring"}, {TailMode::Cut, "Cut"}, {TailMode::Loop, "Loop"}, {TailMode::AutoLoop, "Auto-loop"}};
 	return choices;
 }
 

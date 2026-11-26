@@ -2,6 +2,11 @@
 
 Versions follow `TODO.md`: each `2.N.p` heading is one task, and the last one in a milestone is the released version.
 
+## 2.7.4
+
+- **Auto-loop** tail: each slice's analysis now searches its post-attack audio for a seamless loop (DESIGN §6.5). Candidate lengths are whole pitch periods (or 20 ms upward when the pitch is unclear). They are scored by the correlation, level match and zero-crossing-rate match of the windows before the loop end and start, with a slight preference for longer loops, and snapped to rising zero crossings.
+- The SLICE page shows the found loop and its score. Dragging a loop flag in Auto-loop switches the slice to Loop with manual points.
+
 ## 2.7.3
 
 - **Loop** tail: after its attack, a slice repeats a loop region until its gate ends. The region is set by hand or found automatically (transient end to slice end). Loops play forward with a raised-cosine crossfade into the audio before the loop start (SETTINGS → **Loop xfade**, 10 ms by default), or ping-pong. Reversed slices don't loop.

@@ -111,10 +111,18 @@ struct SlicePage : Page {
 		return math::Rect(Vec(kPad + cw * float(i % size_t(kFieldCols)), y + kFieldH * float(i / size_t(kFieldCols))), Vec(cw - 6, kFieldH));
 	}
 
-	// Loop points as frames, manual or automatic.
-	static SlicePlayer::LoopPoints points(const Loop& l, size_t i) {
+	// The slice's own tail, or the global one.
+	static TailMode tailOf(Spools* m, const Loop& l, size_t i) {
+		if (l.slices[i].p.tail != TailMode::Inherit) return l.slices[i].p.tail;
+		const auto& c = tailChoices();
+		return c[std::min(size_t(m->params[Spools::TAIL_PARAM].getValue()), c.size() - 1)].mode;
+	}
+
+	// Loop points as frames: manual, searched (Auto-loop) or the default region.
+	static SlicePlayer::LoopPoints points(Spools* m, const Loop& l, size_t i) {
 		const SliceParams& p = l.slices[i].p;
-		auto lp = loopPoints(l, i, SlicePlayer::span(*l.audio, l.slices[i].start, l.sliceEnd(i), p.startTrim, p.endTrim, false), {});
+		auto lp = loopPoints(l, i, SlicePlayer::span(*l.audio, l.slices[i].start, l.sliceEnd(i), p.startTrim, p.endTrim, false), {},
+			tailOf(m, l, i));
 		lp.start = std::clamp(lp.start, double(l.slices[i].start), double(l.sliceEnd(i)));
 		lp.end = std::clamp(lp.end, lp.start, double(l.sliceEnd(i)));
 		return lp;
@@ -190,7 +198,7 @@ struct SlicePage : Page {
 		if (pos.y < v.top || pos.y > v.bottom) return true;
 		const double sr = l.audio->sampleRate;
 		if (pos.y < v.top + kFlag + 2) {  // loop flags along the top
-			auto lp = points(l, v.index);
+			auto lp = points(m, l, v.index);
 			if (std::fabs(pos.x - v.x(lp.start)) <= kGrab) { drag = Drag::LoopStart; return true; }
 			if (std::fabs(pos.x - v.x(lp.end)) <= kGrab) { drag = Drag::LoopEnd; return true; }
 		}
@@ -219,7 +227,8 @@ struct SlicePage : Page {
 			}
 			case Drag::LoopStart:
 			case Drag::LoopEnd: {
-				auto lp = points(l, i);  // the first move turns automatic points into manual ones
+				auto lp = points(m, l, i);  // the first move turns automatic points into manual ones
+				if (tailOf(m, l, i) == TailMode::AutoLoop) p.tail = TailMode::Loop;  // so the manual points are used
 				if (drag == Drag::LoopStart) lp.start = std::clamp(f, from, lp.end - minLoop);
 				else lp.end = std::clamp(f, lp.start + minLoop, from + len);
 				p.loopStart = float((lp.start - from) / sr);
@@ -291,10 +300,12 @@ struct SlicePage : Page {
 		ctx.fillRect(ax + v.x0, top, v.x1 - v.x0, bottom - top, withAlpha(hue, 0.08f));
 
 		// Loop region: bright when set by hand, faint when automatic.
-		const auto lp = points(l, i);
-		const bool manual = p.hasLoopPoints();
+		const auto lp = points(m, l, i);
+		const TailMode tail = tailOf(m, l, i);
+		const bool searched = tail == TailMode::AutoLoop && hasFeatures && (*l.features)[i].loop.score > 0;
+		const bool manual = !searched && tail != TailMode::AutoLoop && p.hasLoopPoints();
 		const float la = fx(lp.start), lb = fx(lp.end);
-		ctx.fillRect(la, top, lb - la, bottom - top, withAlpha(kAccent, manual ? 0.16f : 0.07f));
+		ctx.fillRect(la, top, lb - la, bottom - top, withAlpha(kAccent, manual || searched ? 0.16f : 0.07f));
 
 		for (float x = ax + v.x0; x < ax + v.x1; x += 1.f) {
 			size_t f0 = size_t(v.frame(x - ax)), f1 = std::max(f0 + 1, size_t(v.frame(x + 1 - ax)));
@@ -315,7 +326,7 @@ struct SlicePage : Page {
 			for (float y = top; y < bottom; y += 6) ctx.fillRect(tx, y, 1, 3, kText);
 			ctx.text(tx + 3, bottom - 3, NVG_ALIGN_LEFT | NVG_ALIGN_BASELINE, 11, kDim, "T");
 		}
-		const NVGcolor flag = manual ? kAccent : withAlpha(kAccent, 0.6f);
+		const NVGcolor flag = manual || searched ? kAccent : withAlpha(kAccent, 0.6f);
 		for (int k = 0; k < 2; k++) {
 			const float x = k ? lb : la;
 			ctx.fillRect(x - (k ? 1 : 0), top, 1.5f, bottom - top, flag);
@@ -328,7 +339,8 @@ struct SlicePage : Page {
 			nvgFill(vg);
 		}
 		ctx.text((la + lb) / 2, top + 11, NVG_ALIGN_CENTER | NVG_ALIGN_BASELINE, 11, kText,
-			string::f("%s%s", manual ? "LOOP" : "AUTO LOOP", p.pingPong ? " ⇄" : ""));
+			searched ? string::f("FOUND %.0f%%%s", (*l.features)[i].loop.score * 100, p.pingPong ? " ⇄" : "")
+				: string::f("%s%s", manual ? "LOOP" : "AUTO LOOP", p.pingPong ? " ⇄" : ""));
 		for (bool end : {false, true}) {
 			const float tx = fx(end ? to - p.endTrim * sr : from + p.startTrim * sr);
 			nvgBeginPath(vg);

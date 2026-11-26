@@ -35,9 +35,10 @@ struct VoiceOut {
 	float ampEnv = 0, filterEnv = 0;
 };
 
-// Loop-tail points for slice i: its manual points, else from the transient end (a quarter in when
-// features are not ready) to the end of the span.
-SlicePlayer::LoopPoints loopPoints(const Loop& l, size_t i, const SlicePlayer::Span& span, const VoiceParams& vp);
+// Loop points for slice i. Loop: its manual points, else from the transient end (a quarter in when features
+// are not ready) to the end of the span. AutoLoop: the searched loop, else as Loop without manual points.
+SlicePlayer::LoopPoints loopPoints(const Loop& l, size_t i, const SlicePlayer::Span& span, const VoiceParams& vp,
+	TailMode tail = TailMode::Loop);
 
 // One note-mode voice: a phrase sequencer driving two slice players so a new slice can start
 // while the previous one fades out underneath it.

@@ -65,6 +65,7 @@ The tail decides what a slice does when its time slot and its audio differ in le
 - **Ring**: the slice plays to its end, or until the next slice starts.
 - **Cut**: the slice is gated at DUR × its slot and fades out over the overlap time.
 - **Loop**: the slice plays its attack once, then repeats its loop region until the gate (DUR × slot) ends, so short hits can sustain through long slots. The region runs from the transient end to the slice end unless you set it by hand. Drag the amber flags on the SLICE page to set it, and double-click the waveform to return to automatic. Loops play forward with a crossfade (**Loop xfade** on the SETTINGS page, 10 ms by default) or ping-pong without one. Reversed slices play once without looping.
+- **Auto-loop**: as Loop, but the loop is searched for when the slice is analysed. For pitched sounds its length is a whole number of periods; otherwise lengths from 20 ms up are tried. Each candidate is scored on how well the audio before its end matches the audio before its start (shape, level and brightness), longer loops win ties, and both ends sit on rising zero crossings. The SLICE page shows the loop found and its score (FOUND 97 %). Manual points are ignored in this mode; dragging a flag switches that slice to Loop with manual points. When nothing is found, it behaves like Loop.
 
 ## Crop and tempo
 

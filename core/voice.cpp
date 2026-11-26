@@ -18,18 +18,22 @@ void Voice::reset() {
 	fenv.reset();
 }
 
-SlicePlayer::LoopPoints loopPoints(const Loop& l, size_t i, const SlicePlayer::Span& span, const VoiceParams& vp) {
+SlicePlayer::LoopPoints loopPoints(const Loop& l, size_t i, const SlicePlayer::Span& span, const VoiceParams& vp, TailMode tail) {
 	const Slice& s = l.slices[i];
 	const double sr = l.audio->sampleRate, from = double(s.start);
 	SlicePlayer::LoopPoints lp;
 	lp.pingPong = s.p.pingPong;
 	lp.xfade = vp.loopXfade * sr;
-	if (s.p.hasLoopPoints()) {
+	const bool known = l.features && i < l.features->size();
+	if (tail == TailMode::AutoLoop && known && (*l.features)[i].loop.score > 0) {
+		lp.start = from + double((*l.features)[i].loop.start);
+		lp.end = from + double((*l.features)[i].loop.end);
+	}
+	else if (tail != TailMode::AutoLoop && s.p.hasLoopPoints()) {
 		lp.start = from + s.p.loopStart * sr;
 		lp.end = from + s.p.loopEnd * sr;
 	}
 	else {
-		const bool known = l.features && i < l.features->size();
 		lp.start = known ? from + double((*l.features)[i].transientEnd) : span.start + (span.end - span.start) / 4;
 		lp.end = span.end;
 	}
@@ -55,7 +59,7 @@ void Voice::begin(int slice, bool phraseStart, double slotSeconds, const Loop& l
 	rateBase = l.audio->sampleRate / engineRate;
 	players[cur].setQuality(vp.quality);
 	players[cur].start(l.audio.get(), span, rateBase * semitonesToRatio(r.pitch), engineRate);
-	if (r.tail == TailMode::Loop) players[cur].setLoop(loopPoints(l, size_t(slice), span, vp));
+	if (r.tail == TailMode::Loop || r.tail == TailMode::AutoLoop) players[cur].setLoop(loopPoints(l, size_t(slice), span, vp, r.tail));
 	sliceOf[cur] = slice;
 
 	if (l.audio->channels == 1) {  // equal-power pan, unity at centre

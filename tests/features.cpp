@@ -56,3 +56,32 @@ TEST_CASE("analyzeSlices covers every slice") {
 	CHECK(f[0].pitch.period == doctest::Approx(48000 / 220.0).epsilon(0.01));
 	CHECK(f[1].pitch.period == doctest::Approx(48000 / 220.0).epsilon(0.01));
 }
+
+TEST_CASE("auto-loop: whole periods of a steady tone, on rising zero crossings, after the attack") {
+	for (double hz : {110.0, 220.0, 440.0}) {
+		auto a = hitThenTone(hz);
+		auto f = analyzeSlice(*a, 0, a->frames);
+		const auto& lp = f.loop;
+		REQUIRE(lp.score > 0.9f);
+		CHECK(lp.start >= f.transientEnd);
+		CHECK(lp.end <= a->frames);
+		const double periods = double(lp.end - lp.start) / (48000 / hz);
+		CHECK(std::fabs(periods - std::round(periods)) < 0.02);
+		const auto& x = a->data[0];
+		for (size_t i : {lp.start, lp.end}) CHECK((x[i - 1] < 0 && x[i] >= 0));
+		CHECK(double(lp.end - lp.start) > 0.2 * 48000);  // prefers long loops when they all fit
+	}
+}
+
+TEST_CASE("auto-loop: noise without pitch still finds a level-matched loop or none; short slices find none") {
+	auto a = std::make_shared<Audio>();
+	a->sampleRate = 48000;
+	a->channels = 1;
+	std::mt19937 rng(5);
+	std::uniform_real_distribution<float> u(-1, 1);
+	for (int i = 0; i < 24000; i++) a->data[0].push_back(0.3f * u(rng));
+	a->frames = 24000;
+	auto lp = findLoop(*a, 0, 24000, 0, {});
+	CHECK(lp.score < 0.5f);
+	CHECK(findLoop(*a, 0, 600, 0, {}).score == 0.f);
+}

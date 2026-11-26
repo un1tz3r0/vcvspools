@@ -274,3 +274,32 @@ TEST_CASE("Loop tail sustains a slice through a long slot, from its own loop poi
 	CHECK(a.start == 3000);  // no features yet: a quarter in
 	CHECK(a.end == 12000);
 }
+
+TEST_CASE("Auto-loop tail sustains a pitched slice seamlessly on its searched loop") {
+	auto a = std::make_shared<Audio>();
+	a->sampleRate = 48000;
+	a->channels = 1;
+	a->frames = 12000;
+	for (size_t i = 0; i < a->frames; i++) {
+		double t = i / 48000.0;
+		a->data[0].push_back(float(0.15 * std::sin(2 * M_PI * 220 * t) * (t < 0.01 ? 4 - 3 * t / 0.01 : 1)));
+	}
+	auto base = makeLoop(a, {0, 12000}, 240, true, {});
+	auto l = std::make_shared<Loop>(*base);
+	l->features = std::make_shared<const std::vector<SliceFeatures>>(analyzeSlices(*l));
+	REQUIRE((*l->features)[0].loop.score > 0.9f);
+	PhraseParams p;
+	p.length = 1;
+	VoiceParams vp;
+	vp.tail = TailMode::AutoLoop;
+	Voice v;
+	auto r = render(v, *l, p, vp, 0.5, 30000);  // slot 24000, audio 12000
+	float maxStep = 0, peak = 0;
+	for (size_t i = 2000; i < 23000; i++) {
+		maxStep = std::max(maxStep, std::fabs(r.l[i + 1] - r.l[i]));
+		if (i > 14000) peak = std::max(peak, std::fabs(r.l[i]));
+	}
+	CHECK(maxStep < 0.006f);  // a 220 Hz sine at 0.15 moves at most 0.0043 per sample
+	CHECK(peak == doctest::Approx(0.15f).epsilon(0.03));
+	CHECK(r.l[25000] == 0.f);
+}
