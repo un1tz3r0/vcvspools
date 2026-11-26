@@ -181,6 +181,7 @@ The exact layout is settled in the panel milestone. If it doesn't fit, envelope 
 
 Drawn with NanoVG in `drawLayer(1)`, so it stays lit when the room lights are dimmed. The background is dark neutral and the content colour is light.
 
+- **Legibility at 100% zoom** is a hard requirement. Rack draws 1 panel px = 1 screen px at 100% (a 36 HP panel is 540 px wide). Minimum sizes, in NanoVG px: 11 for display body text, 13 for tabs and readouts, 16+ for the main BPM/slice readout. Display text has ≥ 7:1 contrast on its background. Panel labels are ≥ 2.6 mm cap height in the SVG (about 10 px). Fine detail such as grid ticks can be thin, but never text. Every UI change is checked with a 100%-zoom screenshot before it is committed.
 - **Pages**: a tab row across the top of the display picks the page.
   - **Loop**: the default page. It shows the cropped loop with slices, the region and playheads. A *Crop* toggle switches to the whole source file with crop handles.
   - **Slice**: a zoomed editor for the selected slice. It shows start/end trims, the transient-end marker, loop points (manual or auto), and the tail mode, with per-slice parameters as numeric fields.
