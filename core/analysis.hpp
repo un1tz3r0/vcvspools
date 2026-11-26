@@ -27,6 +27,22 @@ struct OnsetOptions {
 // Returns source frames, ascending.
 std::vector<size_t> pickOnsets(const OnsetEnvelope& env, const Audio& audio, const OnsetOptions& opts = {});
 
+struct TempoEstimate {
+	double bpm = 120;
+	double confidence = 0;  // 0..1, peak sharpness of the tempo score
+	double phase = 0;       // seconds from the start to the first beat of the grid
+	bool barFit = false;    // bpm was snapped so the audio is a whole number of bars
+};
+
+// Autocorrelation of the onset envelope, weighted by a log-normal prior around 120 BPM and summed over
+// the first four multiples of each lag (comb), within [minBpm, maxBpm]. If the audio is within 1.5 % of a
+// whole number of bars at that tempo, the tempo snaps to fit exactly and the phase is zero.
+TempoEstimate estimateTempo(const OnsetEnvelope& env, double audioSeconds, int beatsPerBar = 4,
+	double minBpm = 60, double maxBpm = 200);
+
+// Beat-grid offset (seconds, in [0, 60/bpm)) that best lines up with the onset envelope.
+double gridPhase(const OnsetEnvelope& env, double bpm);
+
 // Moves `frame` back (up to `maxBack` frames) to the nearest zero crossing of the mono mix.
 size_t snapToZeroCrossing(const Audio& audio, size_t frame, size_t maxBack = 256);
 

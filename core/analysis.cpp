@@ -117,4 +117,63 @@ std::vector<size_t> pickOnsets(const OnsetEnvelope& env, const Audio& a, const O
 	return out;
 }
 
+double gridPhase(const OnsetEnvelope& env, double bpm) {
+	const auto& f = env.flux;
+	const double period = 60.0 / bpm * env.frameRate();  // in envelope frames
+	if (f.empty() || period < 1) return 0;
+	double best = -1, bestPhase = 0;
+	for (double ph = 0; ph < period; ph += 0.25) {
+		double sum = 0;
+		for (double t = ph; t < double(f.size()) - 1; t += period) {
+			size_t i = size_t(t);
+			double frac = t - double(i);
+			sum += f[i] * (1 - frac) + f[i + 1] * frac;
+		}
+		if (sum > best) best = sum, bestPhase = ph;
+	}
+	return bestPhase / env.frameRate();
+}
+
+TempoEstimate estimateTempo(const OnsetEnvelope& env, double seconds, int beatsPerBar, double minBpm, double maxBpm) {
+	TempoEstimate est;
+	const auto& f = env.flux;
+	const double fr = env.frameRate();
+	if (f.size() < 8) return est;
+
+	auto acf = [&](double lag) {  // fractional-lag autocorrelation, normalised by overlap
+		size_t l = size_t(lag);
+		double frac = lag - double(l), s = 0;
+		if (l + 1 >= f.size()) return 0.0;
+		size_t n = f.size() - l - 1;
+		for (size_t t = 0; t < n; t++) s += double(f[t]) * (f[t + l] * (1 - frac) + f[t + l + 1] * frac);
+		return s / double(n);
+	};
+
+	double bestScore = -1, bestBpm = 120, sumScore = 0;
+	int count = 0;
+	for (double bpm = minBpm; bpm <= maxBpm; bpm += 0.25) {
+		double lag = 60.0 / bpm * fr, score = 0;
+		for (int k = 1; k <= 4; k++) score += acf(lag * k) / k;
+		double octaves = std::log2(bpm / 120.0);
+		score *= std::exp(-0.5 * octaves * octaves / (0.9 * 0.9));
+		sumScore += score;
+		count++;
+		if (score > bestScore) bestScore = score, bestBpm = bpm;
+	}
+	est.bpm = bestBpm;
+	est.confidence = bestScore > 0 ? std::clamp(1.0 - (sumScore / count) / bestScore, 0.0, 1.0) : 0;
+
+	// Fit to whole bars when close: loops are usually cut on bar lines.
+	double beats = seconds * est.bpm / 60.0;
+	double bars = std::max(1.0, std::round(beats / beatsPerBar));
+	double fitted = bars * beatsPerBar * 60.0 / seconds;
+	if (std::fabs(fitted / est.bpm - 1) < 0.015 && fitted >= minBpm * 0.9 && fitted <= maxBpm * 1.1) {
+		est.bpm = fitted;
+		est.barFit = true;
+		est.phase = 0;
+	}
+	else est.phase = gridPhase(env, est.bpm);
+	return est;
+}
+
 }

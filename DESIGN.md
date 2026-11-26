@@ -94,7 +94,7 @@ Runs on the worker after import or crop, and again when the sensitivity, grid or
 
 1. **Onset envelope**: mono mix, STFT (1024/256, Hann, in-house radix-2 FFT), log-magnitude spectral flux, half-wave rectified, then high-pass filtered.
 2. **Onset picking**: adaptive threshold = median over ±N frames + `δ`. `δ` is driven by the *Onset sensitivity* control. A minimum inter-onset gap applies. Each onset is refined to a local energy rise, then to the nearest preceding zero crossing.
-3. **Tempo**: autocorrelation of the onset envelope, weighted by a log-normal prior centred on 120 BPM over 60–200, then a comb-filter bank to pick the octave. If crop duration × BPM is close to a whole number of bars, BPM is nudged to exactly fit (so loops loop). Manual BPM overrides this. *Halve*, *double* and *tap* are menu actions.
+3. **Tempo**: autocorrelation of the onset envelope, weighted by a log-normal prior centred on 120 BPM over 60–200, then a comb-filter bank to pick the octave. If crop duration × BPM is within 1.5 % of a whole number of bars, BPM is nudged to exactly fit (so loops loop). Manual BPM overrides this. *Halve*, *double* and *tap* are menu actions.
 4. **Beat grid**: phase found by cross-correlating an impulse train with the onset envelope, or set to crop start when the crop is bar-aligned (the default).
 5. **Slicing modes**: *Onsets*, *Grid* (1/4, 1/8, 1/16, 1/32, triplets), *Hybrid* (grid points plus strong onsets). *Grid snap strength* (0–100%) moves each onset toward its nearest grid line: `pos = lerp(onset, grid, s)`. Each slice's `beat` is its (snapped) position in beats.
 6. **Per-slice features** for tail modes:

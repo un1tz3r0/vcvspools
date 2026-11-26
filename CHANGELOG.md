@@ -2,6 +2,11 @@
 
 Versions follow `TODO.md`: each `2.N.p` heading is one task, and the last one in a milestone is the released version.
 
+## 2.3.3
+
+- Tempo estimation: autocorrelation of the onset envelope scored over four lag multiples (comb), with a log-normal prior centred on 120 BPM between 60 and 200 BPM, plus a confidence value.
+- Loops within 1.5 % of a whole number of bars snap to the exact tempo with a zero grid phase. Otherwise the grid phase is found by correlating a beat comb with the envelope.
+
 ## 2.3.2
 
 - Onset picking: local maxima of the envelope above a 0.2 s running median plus a sensitivity-controlled delta, with a minimum gap that merges flams. Each onset is refined in the waveform to where the hit starts rising, within about 2 ms in tests, then moved back to the preceding zero crossing.

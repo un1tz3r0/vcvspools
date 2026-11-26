@@ -102,3 +102,38 @@ TEST_CASE("zero-crossing snap") {
 	CHECK(snapToZeroCrossing(a, 0) == 0);
 	CHECK(snapToZeroCrossing(a, 47, 3) == 47);
 }
+
+static std::vector<double> grid(double bpm, double offset, double seconds, int every = 1) {
+	std::vector<double> at;
+	for (double t = offset; t < seconds - 0.05; t += 60.0 / bpm * every) at.push_back(t);
+	return at;
+}
+
+TEST_CASE("tempo: bar-exact loop snaps to the exact tempo") {
+	double seconds = 8 * 60.0 / 128;  // two bars at 128
+	Audio a = hits(grid(128, 0, seconds), seconds);
+	auto est = estimateTempo(onsetEnvelope(a), seconds);
+	CHECK(est.barFit);
+	CHECK(est.bpm == doctest::Approx(128).epsilon(1e-9));
+	CHECK(est.phase == 0);
+}
+
+TEST_CASE("tempo: offset grid on a non-bar-length file") {
+	double seconds = 7.3;
+	Audio a = hits(grid(95, 0.1, seconds), seconds);
+	auto est = estimateTempo(onsetEnvelope(a), seconds);
+	CHECK_FALSE(est.barFit);
+	CHECK(est.bpm == doctest::Approx(95).epsilon(0.01));
+	CHECK(est.phase == doctest::Approx(0.1).epsilon(0.08));
+	CHECK(est.confidence > 0.3);
+}
+
+TEST_CASE("tempo: the prior picks 140 over 70, eighth-note hats do not double it") {
+	double seconds = 6.1;
+	auto at = grid(140, 0, seconds);
+	Audio a = hits(at, seconds);
+	Audio hats = hits(grid(280, 60.0 / 280, seconds, 2), seconds, 44100, 0.15f);
+	for (size_t i = 0; i < a.frames; i++) a.data[0][i] += hats.data[0][i];
+	auto est = estimateTempo(onsetEnvelope(a), seconds);
+	CHECK(est.bpm == doctest::Approx(140).epsilon(0.01));
+}
