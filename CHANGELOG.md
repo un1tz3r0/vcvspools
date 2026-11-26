@@ -2,6 +2,12 @@
 
 Versions follow `TODO.md`: each `2.N.p` heading is one task, and the last one in a milestone is the released version.
 
+## 2.4.3
+
+- Parameter resolution in one place: knob + CV·amount + per-slice offset, clamped per parameter (`core/params.hpp`).
+- Pitch, level, cutoff and resonance glide (5 ms one-pole) toward targets re-resolved every 32 samples, on a 4-sample control tick. Level changes now reach a slice that is already playing, and each of the two overlapping players keeps the level of its own slice. A new slice starts at its own pitch without gliding in.
+- Knob-only values (envelopes, filter type, tail, quality) are read every 32 samples instead of every sample.
+
 ## 2.4.2
 
 - Amp and filter ADSR envelopes with exponential segments (0–10 s), a ±5 octave filter envelope amount, and AENV/FENV outputs (0–10 V, polyphonic).

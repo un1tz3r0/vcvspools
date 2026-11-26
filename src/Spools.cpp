@@ -81,6 +81,8 @@ Spools::Spools() {
 	configOutput(TRIG_OUTPUT, "Slice start trigger");
 	configOutput(EOC_OUTPUT, "End of phrase");
 	for (int c = 0; c < kMaxVoices; c++) { playingSlice[c] = -1; playheads[c] = -1.f; }
+	paramDivider.setDivision(32);
+	paramDivider.clock = 31;  // read the knobs on the first sample
 	worker.reset(new Worker);
 }
 
@@ -201,17 +203,20 @@ void Spools::process(const ProcessArgs& args) {
 	phrase.direction = Direction(int(params[DIRECTION_PARAM].getValue()));
 	phrase.loopCount = int(params[LOOP_COUNT_PARAM].getValue());
 
-	VoiceParams vp;
-	vp.tail = params[TAIL_PARAM].getValue() > 0.5f ? TailMode::Cut : TailMode::Ring;
-	vp.duration = params[DURATION_PARAM].getValue();
-	vp.quality = eco ? &SincTable::eco() : &SincTable::hq();
-	vp.filter = FilterType(int(params[FILTER_TYPE_PARAM].getValue()));
-	vp.filterEnvAmount = params[FILTER_ENV_AMOUNT_PARAM].getValue();
-	vp.filterEnv = {envSeconds(params[FILTER_A_PARAM].getValue()), envSeconds(params[FILTER_D_PARAM].getValue()),
-		params[FILTER_S_PARAM].getValue(), envSeconds(params[FILTER_R_PARAM].getValue())};
-	vp.ampEnv = {envSeconds(params[AMP_A_PARAM].getValue()), envSeconds(params[AMP_D_PARAM].getValue()),
-		params[AMP_S_PARAM].getValue(), envSeconds(params[AMP_R_PARAM].getValue())};
-	vp.retriggerPerNote = retriggerPerNote;
+	if (paramDivider.process()) {  // knob-only values change slowly; per-voice CV is read every sample below
+		VoiceParams& g = globalParams;
+		g.tail = params[TAIL_PARAM].getValue() > 0.5f ? TailMode::Cut : TailMode::Ring;
+		g.duration = params[DURATION_PARAM].getValue();
+		g.quality = eco ? &SincTable::eco() : &SincTable::hq();
+		g.filter = FilterType(int(params[FILTER_TYPE_PARAM].getValue()));
+		g.filterEnvAmount = params[FILTER_ENV_AMOUNT_PARAM].getValue();
+		g.filterEnv = {envSeconds(params[FILTER_A_PARAM].getValue()), envSeconds(params[FILTER_D_PARAM].getValue()),
+			params[FILTER_S_PARAM].getValue(), envSeconds(params[FILTER_R_PARAM].getValue())};
+		g.ampEnv = {envSeconds(params[AMP_A_PARAM].getValue()), envSeconds(params[AMP_D_PARAM].getValue()),
+			params[AMP_S_PARAM].getValue(), envSeconds(params[AMP_R_PARAM].getValue())};
+		g.retriggerPerNote = retriggerPerNote;
+	}
+	VoiceParams vp = globalParams;
 
 	const double beat = timebase.phase(), period = timebase.beatPeriod();
 	for (int c = 0; c < channels; c++) {

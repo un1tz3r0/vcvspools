@@ -2,6 +2,7 @@
 #include "envelope.hpp"
 #include "filter.hpp"
 #include "loop.hpp"
+#include "params.hpp"
 #include "sequencer.hpp"
 #include "sliceplayer.hpp"
 
@@ -47,13 +48,18 @@ private:
 	SlicePlayer players[2];
 	int cur = 0, lastSlice = -1;
 	double slotLeft = 0;  // seconds until a Cut-mode slice is gated off
-	float gainL[2] = {1, 1}, gainR[2] = {1, 1}, pitch = 0, rateBase = 0;
+	float panL[2] = {1, 1}, panR[2] = {1, 1}, rateBase = 0;
+	int sliceOf[2] = {-1, -1};               // slice each player is sounding
+	Smoother gain[2], pitch, cutoff, res;    // gain is linear
+	int controlCountdown = 0, targetCountdown = 0;
 	bool released = false;
 	const Loop* loop = nullptr;
 	VoiceFilter filter;
 	Adsr amp[2], fenv;  // one amp envelope per player, so an outgoing slice keeps its own
-	int filterCountdown = 0;  // coefficients are refreshed every kFilterEvery samples
-	static constexpr int kFilterEvery = 4;
+	// Continuous parameters glide (5 ms) on a 4-sample control tick; their targets are re-resolved every 32.
+	static constexpr int kControlEvery = 4, kTargetEvery = 32;
+	static constexpr float kGlide = 0.005f;
+	void updateTargets(const Loop& l, const VoiceParams& vp);
 
 	void begin(int slice, bool phraseStart, double slotSeconds, const Loop& l, const VoiceParams& vp, float engineRate);
 	void noteOff(const VoiceParams& vp);

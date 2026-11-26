@@ -54,6 +54,8 @@ struct Spools : Module {
 	spools::Voice voices[kMaxVoices];
 	dsp::SchmittTrigger clockTrigger, gateTriggers[kMaxVoices];
 	dsp::PulseGenerator trigPulses[kMaxVoices], eocPulses[kMaxVoices];
+	dsp::ClockDivider paramDivider;
+	spools::VoiceParams globalParams;
 
 	// Settings (UI thread writes, audio thread reads).
 	std::atomic<int> ppqn{1};

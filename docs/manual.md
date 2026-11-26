@@ -26,6 +26,7 @@ Spools is an early proof of concept. See `DESIGN.md` for the planned behaviour a
 - **REGION** start/end limit which slices are reachable. Note offsets wrap inside the region.
 - **TAIL**: *Ring* lets each slice play out. *Cut* gates it after **DURATION** × its time slot.
 - **OVERLAP** is how long a slice keeps fading out after the next one starts.
+- **Per-slice settings** add to the knobs: a slice's own pitch, level, pan, trims, cutoff, resonance and crossfade are offsets on top of the knob and CV values. The sums are limited to a usable range (for example ±48 semitones, +12 dB). Pitch, level, cutoff and resonance follow knob and CV changes while a slice plays, with a 5 ms glide. The other settings are read when each slice starts.
 - **Envelopes** restart on each slice by default, so every hit gets its own attack. Right-click → **Envelope retrigger** → *Each note* runs them once per triggered phrase instead. The amp envelope's release starts when the note ends (gate released, or the Cut time is up). A release shorter than OVERLAP uses the overlap fade instead. The default (no attack, full sustain, no release) leaves the sound unchanged.
 
 ## Crop and tempo

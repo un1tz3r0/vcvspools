@@ -189,3 +189,23 @@ TEST_CASE("a long amp release lets the slice ring past the note's end; the filte
 	CHECK(e0 == doctest::Approx(1).epsilon(0.01));
 	CHECK(e1 < 0.01f);
 }
+
+TEST_CASE("volume and pitch changes during a slice glide instead of stepping") {
+	auto loop = steps();
+	PhraseParams p;
+	p.length = 1;
+	VoiceParams vp;
+	Voice v;
+	float prev = 0, maxStep = 0, at5ms = 0;
+	for (int i = 0; i < 9000; i++) {
+		if (i == 3000) vp.gain = -20;
+		VoiceOut o = v.process(i / 48000.0 / 0.25, 0.25, i < 10, i == 0, 0, *loop, p, vp, 48000);
+		if (i > 3000) maxStep = std::max(maxStep, std::fabs(o.left - prev));
+		if (i == 3000 + 32 + 240) at5ms = o.left;
+		prev = o.left;
+	}
+	CHECK(prev == doctest::Approx(0.01f).epsilon(0.01));  // settled at -20 dB
+	CHECK(maxStep < 0.003f);                               // no zipper or jump
+	CHECK(at5ms > 0.02f);                                  // still gliding a few ms in
+	CHECK(at5ms < 0.07f);
+}

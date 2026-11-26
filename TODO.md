@@ -24,10 +24,10 @@ Each top-level item is a minor version (`2.N.0`) and one PR to `main`. Each seco
   - [x] 2.3.4 Slicing modes (onsets/grid/hybrid) with grid-snap strength; re-slice on the worker when settings change
   - [x] 2.3.5 Context-menu crop and BPM text fields (plus halve/double/tap)
 
-- [ ] **2.4 Tone shaping and parameter resolution**
+- [x] **2.4 Tone shaping and parameter resolution**
   - [x] 2.4.1 TPT SVF (LP/BP/HP/notch 12 dB) + 24 dB LP, V/oct cutoff
   - [x] 2.4.2 Amp and filter ADSR, bipolar amount, per-slice/per-note retrigger, AMP/FILT ENV outputs
-  - [ ] 2.4.3 Global + CV×attenuverter + per-slice parameter resolution, smoothing of continuous params
+  - [x] 2.4.3 Global + CV×attenuverter + per-slice parameter resolution, smoothing of continuous params
 
 - [ ] **2.5 Loop mode and transport**
   - [ ] 2.5.1 RUN, CONT, BAR inputs; bar length; bars per cycle with automatic CONT
