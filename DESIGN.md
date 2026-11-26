@@ -115,7 +115,7 @@ Runs on the worker after import or crop, and again when the sensitivity, grid or
 
 - **Region**: `[loopStart, loopEnd]` in slice indices. Start-slice, offsets and phrases all wrap inside it.
 - **Trigger**: on a gate rising edge per poly channel, `offset = round(12 · V/oct)` and `first = wrap(startSlice + offset)`. Negative offsets play earlier slices. Rising edges are delayed to the next *launch quantize* division (off, 1/32 … 1 bar) when that is enabled.
-- **Phrase**: slices `first … first+length-1` (wrapping), in *direction* order. Slice *k* starts `Σ beatLen` beats after the trigger, where `beatLen = slice[k+1].beat - slice[k].beat`. A plain trigger plays the phrase once. A gate that is still high at the end of the phrase repeats it, up to *loop count* times (∞ allowed). When the gate falls, the current slice finishes and the voice releases.
+- **Phrase**: slices `first … first+length-1` (wrapping), in *direction* order. Slice *k* starts `Σ beatLen` beats after the trigger, where `beatLen = slice[k+1].beat - slice[k].beat`. A gate that falls before the first slice ends counts as a trigger and plays the phrase once. A gate still high at the first slice boundary is a held gate: it repeats the phrase at its end, up to *loop count* times (∞ allowed). When the gate falls, the current slice finishes and the voice releases.
 - **Retrigger** on the same channel cuts the old phrase with the crossfade.
 - **Poly**: up to 16 channels, following the V/oct/GATE channel count. Each channel is an independent voice.
 
@@ -128,7 +128,7 @@ Runs on the worker after import or crop, and again when the sensitivity, grid or
 
 ### 6.4 Direction and reverse
 
-Phrase/sequence direction: *forward*, *reverse*, *ping-pong*, *random*. Per-slice `reverse` plays the slice's audio backwards from its end trim, independent of the sequence direction.
+Phrase/sequence direction: *forward*, *reverse*, *ping-pong* (alternate passes forward and backward), *random* (a random slice of the phrase each step). Per-slice `reverse` plays the slice's audio backwards from its end trim, independent of the sequence direction.
 
 ### 6.5 Slice voice and tail modes
 

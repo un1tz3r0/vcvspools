@@ -2,6 +2,12 @@
 
 Versions follow `TODO.md`: each `2.N.p` heading is one task, and the last one in a milestone is the released version.
 
+## 2.2.3
+
+- Note-mode `NoteSequencer`: V/oct semitones offset the start slice and wrap both ways inside the region. Each trigger plays `length` slices, scheduled in beats, so clock tempo changes rescale their start times. Directions are forward, reverse, ping-pong (alternating passes) and random within the phrase.
+- A gate held past the first slice repeats the phrase up to the loop count (0 = forever). Releasing it finishes the current slice. A shorter gate counts as a trigger and plays the whole phrase.
+- Launch quantize to the next beat division, retrigger, end-of-phrase and release events.
+
 ## 2.2.2
 
 - `SlicePlayer`: plays a span of a loop at any rate with Blackman-windowed sinc interpolation, 16 taps or 8 in eco mode. Cutoff tables band-limit reads faster than 1:1.
