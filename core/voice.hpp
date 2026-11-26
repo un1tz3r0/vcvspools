@@ -32,6 +32,7 @@ struct VoiceParams {
 
 struct VoiceOut {
 	float left = 0, right = 0;
+	float sendA = 0, sendB = 0;  // the voice's mono mix (after the filter) at the playing slice's send levels
 	int slice = -1;   // slice now playing (or last played)
 	bool trig = false, eoc = false, playing = false;
 	float ampEnv = 0, filterEnv = 0;
@@ -66,6 +67,7 @@ private:
 	float panL[2] = {1, 1}, panR[2] = {1, 1}, rateBase = 0;
 	int sliceOf[2] = {-1, -1};               // slice each player is sounding
 	Smoother gain[2], pitch, cutoff, res;    // gain is linear
+	Smoother send[2];                        // A and B, of the newest slice
 	int controlCountdown = 0, targetCountdown = 0;
 	bool released = false;
 	// Cached control-rate work: the glide coefficient, the last pitch sent and the last filter setting.

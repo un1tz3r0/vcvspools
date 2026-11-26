@@ -94,6 +94,8 @@ Spools::Spools() {
 	configOutput(SLICE_OUTPUT, "Slice index (1/12 V per slice)");
 	configOutput(TRIG_OUTPUT, "Slice start trigger");
 	configOutput(EOC_OUTPUT, "End of phrase");
+	configOutput(SEND_A_OUTPUT, "Send A (mono, each slice at its own level)");
+	configOutput(SEND_B_OUTPUT, "Send B (mono, each slice at its own level)");
 	for (int c = 0; c < kMaxVoices; c++) { playingSlice[c] = -1; playheads[c] = -1.f; playingStep[c] = -1; }
 	paramDivider.setDivision(32);
 	paramDivider.clock = 31;  // read the knobs on the first sample
@@ -356,6 +358,8 @@ void Spools::process(const ProcessArgs& args) {
 		if (o.eoc) eocPulses[c].trigger(1e-3f);
 		outputs[LEFT_OUTPUT].setVoltage(5.f * o.left, c);
 		outputs[RIGHT_OUTPUT].setVoltage(5.f * o.right, c);
+		outputs[SEND_A_OUTPUT].setVoltage(5.f * o.sendA, c);
+		outputs[SEND_B_OUTPUT].setVoltage(5.f * o.sendB, c);
 		outputs[SLICE_OUTPUT].setVoltage(o.slice >= 0 ? semitonesToVolts(o.slice) : 0.f, c);
 		outputs[TRIG_OUTPUT].setVoltage(trigPulses[c].process(args.sampleTime) ? 10.f : 0.f, c);
 		outputs[EOC_OUTPUT].setVoltage(eocPulses[c].process(args.sampleTime) ? 10.f : 0.f, c);
@@ -421,6 +425,8 @@ json_t* sliceParamsToJson(const SliceParams& p) {
 	num("cutoff", p.cutoff);
 	num("res", p.res);
 	num("xfade", p.xfade);
+	num("sendA", p.sendA);
+	num("sendB", p.sendB);
 	num("loopStart", p.loopStart);
 	num("loopEnd", p.loopEnd);
 	if (p.pingPong) json_object_set_new(j, "pingPong", json_true());
@@ -439,6 +445,8 @@ void sliceParamsFromJson(json_t* j, SliceParams& p) {
 	num("cutoff", p.cutoff);
 	num("res", p.res);
 	num("xfade", p.xfade);
+	num("sendA", p.sendA);
+	num("sendB", p.sendB);
 	num("loopStart", p.loopStart);
 	num("loopEnd", p.loopEnd);
 	p.pingPong = json_is_true(json_object_get(j, "pingPong"));

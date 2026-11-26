@@ -58,7 +58,7 @@ Each top-level item is a minor version (`2.N.0`) and one PR to `main`. Each seco
   - [x] 2.9.3 Pattern page editor and menu actions; persistence in JSON and `spls`
 
 - [ ] **2.10 Per-slice sends and CV**
-  - [ ] 2.10.1 FX send A/B outputs with per-slice levels
+  - [x] 2.10.1 FX send A/B outputs with per-slice levels
   - [ ] 2.10.2 Per-slice CV A/B outputs
 
 - [ ] **2.11 Resizable panel**

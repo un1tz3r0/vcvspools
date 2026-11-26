@@ -2,6 +2,12 @@
 
 Versions follow `TODO.md`: each `2.N.p` heading is one task, and the last one in a milestone is the released version.
 
+## 2.10.1
+
+- **SEND A** and **SEND B** outputs: each voice's mono mix, after its filter and amp envelope, scaled by the playing slice's Send A or Send B level (0 by default), polyphonic. Levels are set on the SLICE page, glide when slices change, and are saved in the patch and the `spls` chunk.
+- The panel is now 40 HP, with a column on the right for the per-slice outputs, and the display is 576 px wide.
+- The SLICE page shows its fields in three rows.
+
 ## 2.9.3
 
 - **PATTERN** page:

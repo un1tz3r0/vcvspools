@@ -15,7 +15,7 @@ Spools is a loop player and slicer for VCV Rack 2. It plays REX2, Acidized WAV a
 
 - **Display**: click the tabs along its top to switch pages.
   - **LOOP**: the loop, one colour per slice, with beat and bar lines, a playhead per voice in its slice's colour, and the region marked by an amber bracket (slices outside it are dimmed). The header shows the file, LOOP MODE and REX badges when they apply, the slice count, the length and the current BPM (a `?` means it was guessed).
-  - **SLICE**: a close-up of the selected slice (the first one, when several are selected; the playing one when none is). The ‹ › buttons in the tab row step through the slices. It shows the trims, the transient end (dotted line, `T`) and the loop region in amber, faint while automatic and bright once set by hand. Below are the slice's own settings: Pitch, Gain, Pan, Cutoff, Res and Xfade (drag up or down, Shift for fine, double-click to reset), and Reverse, Tail, Loop (Forward or Pingpong) and Points (Auto or Manual), which open a menu when clicked.
+  - **SLICE**: a close-up of the selected slice (the first one, when several are selected; the playing one when none is). The ‹ › buttons in the tab row step through the slices. It shows the trims, the transient end (dotted line, `T`) and the loop region in amber, faint while automatic and bright once set by hand. Below are the slice's own settings: Pitch, Gain, Pan, Cutoff, Res and Xfade (drag up or down, Shift for fine, double-click to reset), Reverse, Tail, Loop (Forward or Pingpong) and Points (Auto or Manual), which open a menu when clicked, and Send A and Send B, the slice's levels at the SEND outputs.
 
     ![SLICE page](images/page-slice.png)
   - **PATTERN**: the slice-remap pattern for Pattern mode (see [Transport](#transport)).
@@ -24,6 +24,9 @@ Spools is a loop player and slicer for VCV Rack 2. It plays REX2, Acidized WAV a
 - **Main row**: SLICE (start slice), LENGTH, trim IN/OUT, PITCH, LEVEL, XFADE (overlap), DUR (gate length in Cut mode), QUANT (launch quantize), BPM. Each knob with a CV jack has a small CV-amount knob above the jack.
 - **FROM** and **TO** (region) sit under DUR and BPM.
 - **Bottom**: V/OCT, GATE, CLOCK, RUN, CONT and BAR inputs; outputs L, R, SLICE, TRIG, EOC, AENV, FENV.
+- **Right column**: the per-slice outputs SEND A and SEND B.
+
+The panel is 40 HP.
 
 ## Editing slices on the LOOP page
 
@@ -130,6 +133,7 @@ Every input is polyphonic; channel *n* drives voice *n*. The CV inputs next to a
 | TRIG | 1 ms pulse at each slice start |
 | AENV, FENV | amp and filter envelopes, 0–10 V |
 | EOC | 1 ms pulse at the end of each phrase pass |
+| SEND A, SEND B | each voice's mono mix (after its filter and amp envelope) times the playing slice's Send level, ±5 V, polyphonic. Patch them into effects and mix the returns with L and R. |
 
 ## Engine
 

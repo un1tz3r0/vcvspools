@@ -9,7 +9,7 @@ using namespace theme;
 
 namespace {
 
-constexpr float kHeader = 18, kFieldH = 19, kFieldRows = 2, kFieldCols = 5, kGrab = 5, kFlag = 8;
+constexpr float kHeader = 18, kFieldH = 17, kFieldRows = 3, kFieldCols = 5, kGrab = 5, kFlag = 8;
 
 // A per-slice parameter shown as a name/value cell. Numeric fields drag vertically (Shift for fine) and
 // reset on double-click; choice fields open a menu.
@@ -59,6 +59,8 @@ const std::vector<Field>& fields() {
 					p.loopStart = float((lp.start - from) / sr);
 					p.loopEnd = float((lp.end - from) / sr);
 				}),
+			num("Send A", &SliceParams::sendA, 0, 1, 0.005f, "%.2f"),
+			num("Send B", &SliceParams::sendB, 0, 1, 0.005f, "%.2f"),
 		};
 	}();
 	return f;
@@ -372,7 +374,7 @@ struct SlicePage : Page {
 			math::Rect r = cell(ctx, fi);
 			r.pos = r.pos.plus(ctx.area.pos);
 			if ((fi + fi / size_t(kFieldCols)) % 2 == 0) ctx.fillRect(r.pos.x - 4, r.pos.y, r.size.x + 8, r.size.y, nvgRGBA(0xff, 0xff, 0xff, 0x08));
-			const float y = r.pos.y + 14;
+			const float y = r.pos.y + 13;
 			const bool active = drag == Drag::Field && dragField == fi;
 			ctx.text(r.pos.x, y, NVG_ALIGN_LEFT | NVG_ALIGN_BASELINE, kBody, kDim, f.name);
 			std::string value = f.value ? string::f(f.format, p.*f.value) : f.options[f.get(p)];

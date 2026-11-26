@@ -5,9 +5,11 @@
 
 namespace {
 
-// Layout in panel px (36 HP = 540 x 380), top to bottom: display; tone strip (filter, envelopes);
-// main knob row with a CV amount and jack under each; inputs and outputs. Must match res/Spools*.svg.
-constexpr float kDisplayY = 14, kDisplayH = 136;
+// Layout in panel px (40 HP = 600 x 380), top to bottom: display; tone strip (filter, envelopes);
+// main knob row with a CV amount and jack under each; inputs and outputs. The per-slice outputs sit in a
+// column on the right. Must match res/Spools*.svg.
+constexpr float kDisplayY = 14, kDisplayH = 136, kDisplayW = 576;
+constexpr float kSliceColX = 562, kSliceColY0 = 190, kSliceColStep = 54;  // SEND A, SEND B, CV A, CV B
 constexpr float kStripY = 186, kStripLabelY = 168, kStripStep = 30, kStripGap = 6;
 constexpr float kCol0 = 39, kColStep = 51, kRow1 = 252, kAttY = 287, kCvY = 312, kBottomY = 360;
 float col(int i) { return kCol0 + kColStep * i; }
@@ -160,7 +162,7 @@ struct SpoolsWidget : ModuleWidget {
 		auto* display = new SpoolsDisplay;
 		display->module = module;
 		display->box.pos = Vec(12, kDisplayY);
-		display->box.size = Vec(516, kDisplayH);
+		display->box.size = Vec(kDisplayW, kDisplayH);
 		addChild(display);
 
 		auto* labels = new PanelLabels;
@@ -237,6 +239,14 @@ struct SpoolsWidget : ModuleWidget {
 			float x = 292 + 36 * i;
 			addOutput(createOutputCentered<ThemedPJ301MPort>(Vec(x, kBottomY), module, outs[i]));
 			labels->labels.push_back({x, kBottomY - 18, outLabels[i]});
+		}
+		// Per-slice outputs: each slice sets its own level into them on the SLICE page.
+		const int sliceOuts[] = {S::SEND_A_OUTPUT, S::SEND_B_OUTPUT};
+		const char* sliceLabels[] = {"SEND A", "SEND B"};
+		for (int i = 0; i < 2; i++) {
+			const float y = kSliceColY0 + kSliceColStep * float(i);
+			addOutput(createOutputCentered<ThemedPJ301MPort>(Vec(kSliceColX, y), module, sliceOuts[i]));
+			labels->labels.push_back({kSliceColX, y - 18, sliceLabels[i]});
 		}
 		addChild(labels);
 	}

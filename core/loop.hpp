@@ -27,6 +27,7 @@ struct SliceParams {
 	float pitch = 0;                   // semitones
 	float cutoff = 0, res = 0;         // octaves, 0..1
 	float xfade = 0;                   // seconds
+	float sendA = 0, sendB = 0;        // 0..1, levels into the SEND A/B outputs
 	bool reverse = false;
 	TailMode tail = TailMode::Inherit;
 	// Loop tail: points in seconds from the slice start. loopEnd <= loopStart means "automatic":
