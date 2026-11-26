@@ -4,10 +4,11 @@
 
 namespace {
 
-// Layout in panel px (36 HP = 540 x 380). Row 1 is the main knob row; CV and its amount sit below each knob.
-// The strip between the display and the main row holds the tone controls.
-constexpr float kDisplayH = 94, kStripY = 142, kStripLabelY = 124, kStripStep = 30, kStripGap = 6;
-constexpr float kCol0 = 39, kColStep = 51, kRow1 = 222, kAttY = 258, kCvY = 288, kBottomY = 352;
+// Layout in panel px (36 HP = 540 x 380), top to bottom: display; tone strip (filter, envelopes);
+// main knob row with a CV amount and jack under each; inputs and outputs. Must match res/Spools*.svg.
+constexpr float kDisplayY = 14, kDisplayH = 136;
+constexpr float kStripY = 186, kStripLabelY = 168, kStripStep = 30, kStripGap = 6;
+constexpr float kCol0 = 39, kColStep = 51, kRow1 = 252, kAttY = 287, kCvY = 312, kBottomY = 360;
 float col(int i) { return kCol0 + kColStep * i; }
 
 struct Label { float x, y; const char* text; };
@@ -170,7 +171,7 @@ struct SpoolsWidget : ModuleWidget {
 
 		auto* display = new SpoolsDisplay;
 		display->module = module;
-		display->box.pos = Vec(12, 16);
+		display->box.pos = Vec(12, kDisplayY);
 		display->box.size = Vec(516, kDisplayH);
 		addChild(display);
 
@@ -200,13 +201,13 @@ struct SpoolsWidget : ModuleWidget {
 			}
 		}
 		// Region knobs sit under the two columns without CV; direction, tail and loop count are in the menu.
-		addParam(createParamCentered<RoundSmallBlackKnob>(Vec(col(7), kCvY - 8), module, S::REGION_START_PARAM));
+		addParam(createParamCentered<RoundSmallBlackKnob>(Vec(col(7), kCvY - 6), module, S::REGION_START_PARAM));
 		labels->labels.push_back({col(7), kAttY, "FROM"});
-		addParam(createParamCentered<RoundSmallBlackKnob>(Vec(col(9), kCvY - 8), module, S::REGION_END_PARAM));
+		addParam(createParamCentered<RoundSmallBlackKnob>(Vec(col(9), kCvY - 6), module, S::REGION_END_PARAM));
 		labels->labels.push_back({col(9), kAttY, "TO"});
 
 		// Tone strip: groups of controls with one label centred over each group.
-		float x = 28;
+		float x = 32;
 		auto group = [&](const char* label, std::vector<std::function<void(Vec)>> items) {
 			float x0 = x;
 			for (auto& add : items) { add(Vec(x, kStripY)); x += kStripStep; }
@@ -222,7 +223,7 @@ struct SpoolsWidget : ModuleWidget {
 		group("F.ENV", {knob(S::FILTER_ENV_AMOUNT_PARAM)});
 		auto adsr = [&](const char* label, int first) {
 			static const char* letters[] = {"A", "D", "S", "R"};
-			for (int i = 0; i < 4; i++) labels->labels.push_back({x + kStripStep * i, kStripY + 26, letters[i]});
+			for (int i = 0; i < 4; i++) labels->labels.push_back({x + kStripStep * i, kStripY + 24, letters[i]});
 			group(label, {knob(first), knob(first + 1), knob(first + 2), knob(first + 3)});
 		};
 		adsr("FILTER ENV", S::FILTER_A_PARAM);

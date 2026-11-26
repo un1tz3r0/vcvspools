@@ -34,7 +34,7 @@ Each top-level item is a minor version (`2.N.0`) and one PR to `main`. Each seco
   - [x] 2.5.2 Loop-mode transport voice with direction/count and V/oct slice offset
 
 - [ ] **2.6 Panel and display**
-  - [ ] 2.6.1 Final 36 HP panel SVG and control layout
+  - [x] 2.6.1 Final 36 HP panel SVG and control layout
   - [ ] 2.6.2 Page framework: tab row, `Page`/`DisplayContext`, Loop and Settings pages
   - [ ] 2.6.3 Loop page drawing: OKLCH slice hues, grid, region, playheads, readouts, REX badge, light layer
   - [ ] 2.6.4 Mouse editing: select/deselect/multi-select, drag boundaries and trims, add/delete slices, region handles, zoom/scroll, undo history

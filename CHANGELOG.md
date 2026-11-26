@@ -2,6 +2,11 @@
 
 Versions follow `TODO.md`: each `2.N.p` heading is one task, and the last one in a milestone is the released version.
 
+## 2.6.1
+
+- Final 36 HP layout: taller display (136 px, room for the page tabs), a shaded tone strip with filter and envelope controls, the main knob row with a CV amount and jack under each, and boxed input and output rows. Checked against a 100 %-scale render in light and dark: all labels are 12 px Nunito Bold, no overlaps.
+- Grid snap, onset sensitivity and loop count go on the display's Settings page (2.6.2) instead of panel knobs. DESIGN §7 left the exact layout to this milestone; the panel has no room for them without shrinking the main knobs.
+
 ## 2.5.2
 
 - Loop mode (right-click → **Mode**): the region plays continuously from the start slice, positioned straight from the transport's loop beat, so CONT, BAR and tempo changes never drift. Direction and loop count apply per pass, and the slot timing always follows the region's own slices.
