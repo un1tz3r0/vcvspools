@@ -7,14 +7,14 @@ namespace {
 
 // Layout in panel px (40 HP = 600 x 380), top to bottom: display; tone strip (filter, envelopes);
 // main knob row with a CV amount and jack under each; inputs and outputs. The per-slice outputs sit in a
-// column on the right. Must match res/Spools*.svg.
-constexpr float kDisplayY = 14, kDisplayH = 136, kDisplayW = 576;
-constexpr float kSliceColX = 562, kSliceColY0 = 190, kSliceColStep = 54;  // SEND A, SEND B, CV A, CV B
+// column measured from the right edge. A wider panel only widens the display and the gap before that column.
+constexpr float kDisplayY = 14, kDisplayH = 136, kMargin = 12;
+constexpr float kSliceColInset = 38, kSliceColY0 = 190, kSliceColStep = 54;  // SEND A, SEND B, CV A, CV B
 constexpr float kStripY = 186, kStripLabelY = 168, kStripStep = 30, kStripGap = 6;
 constexpr float kCol0 = 39, kColStep = 51, kRow1 = 252, kAttY = 287, kCvY = 312, kBottomY = 360;
 float col(int i) { return kCol0 + kColStep * i; }
 
-struct Label { float x, y; const char* text; };
+struct Label { float x, y; const char* text; bool fromRight = false; };  // fromRight: x is from the right edge
 
 // Panel text drawn with NanoVG: nanosvg cannot render SVG text, and this keeps labels crisp at any zoom.
 struct PanelLabels : widget::TransparentWidget {
@@ -27,7 +27,64 @@ struct PanelLabels : widget::TransparentWidget {
 		nvgTextLetterSpacing(args.vg, 0.4f);
 		nvgTextAlign(args.vg, NVG_ALIGN_CENTER | NVG_ALIGN_BASELINE);
 		nvgFillColor(args.vg, settings::preferDarkPanels ? nvgRGB(0xe6, 0xe6, 0xe6) : nvgRGB(0x22, 0x22, 0x22));
-		for (auto& l : labels) nvgText(args.vg, l.x, l.y, l.text, nullptr);
+		for (auto& l : labels) nvgText(args.vg, l.fromRight ? box.size.x - l.x : l.x, l.y, l.text, nullptr);
+	}
+};
+
+// The panel, drawn in NanoVG so that it can take any width: background, display well and control boxes.
+struct PanelBackground : widget::Widget {
+	void draw(const DrawArgs& args) override {
+		const bool dark = settings::preferDarkPanels;
+		const float w = box.size.x, h = box.size.y;
+		auto rect = [&](float x, float y, float rw, float rh, float r, NVGcolor c) {
+			nvgBeginPath(args.vg);
+			nvgRoundedRect(args.vg, x, y, rw, rh, r);
+			nvgFillColor(args.vg, c);
+			nvgFill(args.vg);
+		};
+		const NVGcolor boxColor = dark ? nvgRGB(0x2f, 0x2f, 0x30) : nvgRGB(0xd6, 0xd6, 0xd4);
+		rect(0, 0, w, h, 0, dark ? nvgRGB(0x26, 0x26, 0x27) : nvgRGB(0xe4, 0xe4, 0xe2));
+		nvgBeginPath(args.vg);
+		nvgRect(args.vg, 0.5f, 0.5f, w - 1, h - 1);
+		nvgStrokeColor(args.vg, dark ? nvgRGB(0x3a, 0x3a, 0x3b) : nvgRGB(0xc8, 0xc8, 0xc6));
+		nvgStrokeWidth(args.vg, 1);
+		nvgStroke(args.vg);
+		rect(kMargin, kDisplayY, w - 2 * kMargin, kDisplayH, 6, nvgRGB(0x0e, 0x0e, 0x10));
+		rect(12, 156, 516, 62, 5, dark ? nvgRGB(0x2b, 0x2b, 0x2c) : nvgRGB(0xdc, 0xdc, 0xda));
+		rect(12, 326, 240, 48, 5, boxColor);
+		rect(274, 326, 254, 48, 5, boxColor);
+		rect(w - kSliceColInset - 26, 156, 52, 218, 5, boxColor);
+	}
+};
+
+// Drag the right edge to resize, in whole HP; the rack refuses widths that would overlap a neighbour.
+struct ResizeHandle : widget::OpaqueWidget {
+	Spools* module = nullptr;
+	Vec dragStart;
+	float startWidth = 0;
+	ResizeHandle() { box.size = Vec(8, RACK_GRID_HEIGHT); }
+	void onDragStart(const DragStartEvent& e) override {
+		if (e.button != GLFW_MOUSE_BUTTON_LEFT) return;
+		dragStart = APP->scene->rack->getMousePos();
+		startWidth = getAncestorOfType<app::ModuleWidget>()->box.size.x;
+	}
+	void onDragMove(const DragMoveEvent& e) override {
+		auto* mw = getAncestorOfType<app::ModuleWidget>();
+		const int hp = spools::snapPanelHp(startWidth + APP->scene->rack->getMousePos().x - dragStart.x, RACK_GRID_WIDTH);
+		const math::Rect old = mw->box;
+		mw->box.size.x = hp * RACK_GRID_WIDTH;
+		if (!APP->scene->rack->requestModulePos(mw, mw->box.pos)) mw->box = old;
+		else if (module) module->panelHp = hp;
+	}
+	void draw(const DrawArgs& args) override {
+		for (float x : {2.f, 5.f}) {
+			nvgBeginPath(args.vg);
+			nvgMoveTo(args.vg, x + 0.5f, box.size.y / 2 - 14);
+			nvgLineTo(args.vg, x + 0.5f, box.size.y / 2 + 14);
+			nvgStrokeColor(args.vg, settings::preferDarkPanels ? nvgRGB(0x6a, 0x6a, 0x6c) : nvgRGB(0x9a, 0x9a, 0x98));
+			nvgStrokeWidth(args.vg, 1);
+			nvgStroke(args.vg);
+		}
 	}
 };
 
@@ -157,15 +214,17 @@ void tempoMenu(Menu* menu, Spools* m) {
 struct SpoolsWidget : ModuleWidget {
 	SpoolsWidget(Spools* module) {
 		setModule(module);
-		setPanel(createPanel<ThemedSvgPanel>(asset::plugin(pluginInstance, "res/Spools.svg"), asset::plugin(pluginInstance, "res/Spools-dark.svg")));
+		auto* panel = new PanelBackground;
+		panel->box.size = Vec(spools::kPanelMinHp * RACK_GRID_WIDTH, RACK_GRID_HEIGHT);
+		setPanel(panel);
 
-		auto* display = new SpoolsDisplay;
+		display = new SpoolsDisplay;
 		display->module = module;
-		display->box.pos = Vec(12, kDisplayY);
-		display->box.size = Vec(kDisplayW, kDisplayH);
+		display->box.pos = Vec(kMargin, kDisplayY);
+		display->box.size = Vec(box.size.x - 2 * kMargin, kDisplayH);
 		addChild(display);
 
-		auto* labels = new PanelLabels;
+		labels = new PanelLabels;
 		labels->box.size = box.size;
 
 		using S = Spools;
@@ -245,14 +304,41 @@ struct SpoolsWidget : ModuleWidget {
 		const char* sliceLabels[] = {"SEND A", "SEND B", "CV A", "CV B"};
 		for (int i = 0; i < 4; i++) {
 			const float y = kSliceColY0 + kSliceColStep * float(i);
-			addOutput(createOutputCentered<ThemedPJ301MPort>(Vec(kSliceColX, y), module, sliceOuts[i]));
-			labels->labels.push_back({kSliceColX, y - 18, sliceLabels[i]});
+			auto* port = createOutputCentered<ThemedPJ301MPort>(Vec(box.size.x - kSliceColInset, y), module, sliceOuts[i]);
+			addOutput(port);
+			rightColumn.push_back(port);
+			labels->labels.push_back({kSliceColInset, y - 18, sliceLabels[i], true});
 		}
 		addChild(labels);
+
+		handle = new ResizeHandle;
+		handle->module = module;
+		addChild(handle);
+		layoutWidth();
+	}
+
+	SpoolsDisplay* display;
+	PanelLabels* labels;
+	ResizeHandle* handle;
+	std::vector<widget::Widget*> rightColumn;
+	float laidOutWidth = 0;
+
+	// Fit everything that depends on the width to box.size.x.
+	void layoutWidth() {
+		const float w = laidOutWidth = box.size.x;
+		getPanel()->box.size.x = w;
+		labels->box.size = box.size;
+		display->box.size.x = w - 2 * kMargin;
+		handle->box.pos.x = w - handle->box.size.x;
+		for (auto* p : rightColumn) p->box.pos.x = w - kSliceColInset - p->box.size.x / 2;
 	}
 
 	void step() override {
 		if (auto* m = getModule<Spools>()) {
+			if (const float w = m->panelHp * RACK_GRID_WIDTH; w != laidOutWidth) {
+				box.size.x = w;
+				layoutWidth();
+			}
 			m->flushHistory();
 			m->ensureFeatures();
 			m->ensurePattern();

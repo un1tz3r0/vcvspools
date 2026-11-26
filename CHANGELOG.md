@@ -2,6 +2,11 @@
 
 Versions follow `TODO.md`: each `2.N.p` heading is one task, and the last one in a milestone is the released version.
 
+## 2.11.1
+
+- Resizable panel: drag the grip on the right edge to widen Spools from 40 to 120 HP, in whole HP. The display grows with the width; the controls keep their places, and the per-slice outputs stay at the right edge. The width is saved in the patch.
+- The panel is drawn in NanoVG, so the panel SVGs are gone.
+
 ## 2.10.2
 
 - **CV A** and **CV B** outputs: each voice's playing slice sets a voltage (±10 V, 0 by default) on the SLICE page. It steps when a slice starts, holds after the slice ends, and is saved in the patch and the `spls` chunk.

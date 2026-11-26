@@ -557,6 +557,7 @@ json_t* Spools::dataToJson() {
 	json_object_set_new(root, "barsPerCycle", json_integer(barsPerCycle));
 	json_object_set_new(root, "mode", json_integer(playMode));
 	json_object_set_new(root, "displayPage", json_integer(displayPage));
+	json_object_set_new(root, "panelHp", json_integer(panelHp));
 	json_object_set_new(root, "viewStart", json_real(viewStart));
 	json_object_set_new(root, "viewSpan", json_real(viewSpan));
 	json_t* js = json_object();
@@ -600,6 +601,7 @@ void Spools::dataFromJson(json_t* root) {
 	if (json_t* x = json_object_get(root, "stretchTail")) stretchTail = float(json_number_value(x));
 	if (json_t* x = json_object_get(root, "barBeats")) barBeats = clamp(float(json_number_value(x)), 0.f, 64.f);
 	if (json_t* x = json_object_get(root, "displayPage")) displayPage = int(json_integer_value(x));
+	if (json_t* x = json_object_get(root, "panelHp")) panelHp = spools::clampPanelHp(int(json_integer_value(x)));
 	if (json_t* x = json_object_get(root, "viewSpan")) viewSpan = clamp(float(json_number_value(x)), 0.001f, 1.f);
 	if (json_t* x = json_object_get(root, "viewStart")) viewStart = clamp(float(json_number_value(x)), 0.f, 1.f - viewSpan);
 	if (json_t* x = json_object_get(root, "mode")) playMode = clamp(int(json_integer_value(x)), 0, int(kPatternMode));

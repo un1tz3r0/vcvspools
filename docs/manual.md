@@ -26,7 +26,7 @@ Spools is a loop player and slicer for VCV Rack 2. It plays REX2, Acidized WAV a
 - **Bottom**: V/OCT, GATE, CLOCK, RUN, CONT and BAR inputs; outputs L, R, SLICE, TRIG, EOC, AENV, FENV.
 - **Right column**: the per-slice outputs SEND A, SEND B, CV A and CV B.
 
-The panel is 40 HP.
+The panel is 40 HP. Drag its right edge (the two grip lines) to widen it up to 120 HP; the extra width goes to the display, and the per-slice column stays at the right edge. The width is saved in the patch.
 
 ## Editing slices on the LOOP page
 

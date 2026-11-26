@@ -61,5 +61,5 @@ Each top-level item is a minor version (`2.N.0`) and one PR to `main`. Each seco
   - [x] 2.10.1 FX send A/B outputs with per-slice levels
   - [x] 2.10.2 Per-slice CV A/B outputs
 
-- [ ] **2.11 Resizable panel**
-  - [ ] 2.11.1 NanoVG-drawn panel, resize handle, display that grows with width
+- [x] **2.11 Resizable panel**
+  - [x] 2.11.1 NanoVG-drawn panel, resize handle, display that grows with width

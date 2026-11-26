@@ -158,7 +158,7 @@ The slot is `beatLen · beatPeriod · duration`, where *duration* is a fraction 
 
 `effective = clamp(global_knob + cv·attenuverter + slice.p.x)` for every per-slice parameter. Global-only parameters (envelopes, filter type, clock settings, region, length) use only knob + CV. This is evaluated at slice start, except pitch, cutoff, resonance and volume, which are also smoothed and updated every 32 samples.
 
-## 7. Module I/O (36 HP)
+## 7. Module I/O (40 HP, resizable)
 
 **Inputs** (P = polyphonic)
 
@@ -174,7 +174,7 @@ The slot is `beatLen · beatPeriod · duration`, where *duration* is a fraction 
 
 **On the display** (Settings page and per-page toolbars, to save panel space): mode (note/loop/pattern), direction, tail mode, filter type, slicing mode/grid, PPQN, bar length, bars per cycle, retrigger mode, interpolation quality, transient preserve, tail %.
 
-The exact layout is settled in the panel milestone. If it doesn't fit, envelope knobs become small trimpots before the panel grows past 40 HP.
+The panel was 36 HP until 2.10.1, when the per-slice outputs took a column on the right and it became 40 HP. From 2.11.1 it is drawn in NanoVG and can be dragged from 40 to 120 HP; extra width goes to the display.
 
 ## 8. Display and interaction
 
