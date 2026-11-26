@@ -59,7 +59,7 @@ TEST_CASE("autoSlice detects tempo for plain loops and caches the analysis") {
 	CHECK_FALSE(plain->bpmKnown);
 	SliceSettings s;
 	auto l = autoSlice(*plain, s);
-	CHECK(l->bpmKnown);
+	CHECK_FALSE(l->bpmKnown);
 	CHECK(l->bpm == doctest::Approx(120).epsilon(1e-9));  // two bars exactly
 	CHECK(l->slices.size() == 8);
 	for (size_t i = 0; i < l->slices.size(); i++) CHECK(l->slices[i].beat == doctest::Approx(double(i)).epsilon(0.01));

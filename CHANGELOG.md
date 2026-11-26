@@ -2,6 +2,12 @@
 
 Versions follow `TODO.md`: each `2.N.p` heading is one task, and the last one in a milestone is the released version.
 
+## 2.3.5
+
+- **Crop** submenu: start and length text fields that accept `s`, `ms`, `b`, `bars` and `smp` suffixes, a default-unit choice, and *Whole file*. Plain audio is re-sliced and its tempo re-estimated after a crop.
+- **Loop tempo** submenu: BPM text field, halve, double and tap tempo (averages up to 8 taps; the menu stays open while tapping).
+- A detected tempo is now kept as an estimate, so the display shows `?` until the tempo comes from the file or from you.
+
 ## 2.3.4
 
 - Auto-slicing modes: Onsets, Grid (1/4 to 1/32 and triplets) and Hybrid (grid plus strong off-grid hits), with grid-snap strength and sensitivity.

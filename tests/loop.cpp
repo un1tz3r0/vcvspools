@@ -158,3 +158,19 @@ TEST_CASE("worker runs jobs in order and drains on wait") {
 	}
 	for (int i = 0; i < 100; i++) CHECK(order[i] == i);
 }
+
+TEST_CASE("retempo rescales slice beats and marks the tempo known") {
+	auto a = std::make_shared<Audio>();
+	a->sampleRate = 48000;
+	a->channels = 1;
+	a->frames = 96000;
+	a->data[0].assign(a->frames, 0.f);
+	auto l = makeLoop(a, {0, a->frames}, 120, false, {24000, 48000});
+	auto r = retempo(*l, 60);
+	CHECK(r->bpmKnown);
+	CHECK(r->bpm == 60);
+	REQUIRE(r->slices.size() == 3);
+	CHECK(r->slices[1].beat == doctest::Approx(0.5));
+	CHECK(r->beats() == doctest::Approx(2));
+	CHECK(l->slices[1].beat == doctest::Approx(1));  // original untouched
+}

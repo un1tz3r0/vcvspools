@@ -19,7 +19,8 @@ struct SliceSettings {
 std::vector<size_t> computeSlices(const Audio& audio, const OnsetEnvelope& env, double bpm, double phaseSeconds,
 	const SliceSettings& s);
 
-// Re-slices a loop. With `detectTempo`, a tempo that is not already known (REX/Acid/manual) is estimated first.
+// Re-slices a loop. With `detectTempo`, a tempo that is not already known (REX/Acid/manual) is estimated first;
+// it stays marked unknown.
 // The onset envelope is computed once per crop and cached on the loop.
 std::shared_ptr<Loop> autoSlice(const Loop& loop, const SliceSettings& s, bool detectTempo = true);
 

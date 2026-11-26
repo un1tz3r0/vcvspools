@@ -85,5 +85,7 @@ std::shared_ptr<Loop> loadLoop(const uint8_t* data, size_t size, const std::stri
 std::shared_ptr<Loop> recrop(const Loop& loop, Range crop);
 // Same loop with `count` equal slices; params reset.
 std::shared_ptr<Loop> sliceEvenly(const Loop& loop, size_t count);
+// Same slices at a new native tempo, now treated as known; slice beats are recomputed.
+std::shared_ptr<Loop> retempo(const Loop& loop, double bpm);
 
 }

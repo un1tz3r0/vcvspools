@@ -36,6 +36,77 @@ void chooseFile(Spools* module) {
 	std::free(path);
 }
 
+// A text entry inside a menu: Enter applies it and closes the menu.
+struct MenuTextField : ui::TextField {
+	std::function<void(const std::string&)> apply;
+	MenuTextField(std::string initial, std::function<void(const std::string&)> f) : apply(std::move(f)) {
+		box.size.x = 160;
+		text = std::move(initial);
+		selectAll();
+	}
+	void onSelectKey(const SelectKeyEvent& e) override {
+		if (e.action == GLFW_PRESS && (e.key == GLFW_KEY_ENTER || e.key == GLFW_KEY_KP_ENTER)) {
+			apply(text);
+			if (auto* overlay = getAncestorOfType<ui::MenuOverlay>()) overlay->requestDelete();
+			e.consume(this);
+		}
+		if (!e.getTarget()) TextField::onSelectKey(e);
+	}
+};
+
+// Stays open, so you can click along with the loop.
+struct TapItem : ui::MenuItem {
+	Spools* m;
+	double bpm = 0;
+	void onAction(const ActionEvent& e) override {
+		bpm = m->tapTempo.tap(system::getTime());
+		if (bpm > 0) m->setLoopBpm(bpm);
+		e.context->consumed = false;
+	}
+	void step() override {
+		rightText = bpm > 0 ? string::f("%.1f", bpm) : "click on each beat";
+		MenuItem::step();
+	}
+};
+
+void cropMenu(Menu* menu, Spools* m) {
+	auto l = m->loop();
+	if (!l) return;
+	const double sr = l->source->sampleRate, bpm = l->bpm;
+	menu->addChild(createIndexSubmenuItem("Units", {"Samples", "Seconds", "Beats"},
+		[=] { return size_t(m->cropUnit); }, [=](size_t i) { m->cropUnit = spools::CropSpec::Unit(i); }));
+	menu->addChild(createMenuLabel("Start (e.g. 1.5 s, 250 ms, 4 b, 2 bars)"));
+	menu->addChild(new MenuTextField(spools::formatLength(l->crop.start, m->cropUnit, sr, bpm), [=](const std::string& t) {
+		if (auto v = spools::parseLength(t, m->cropUnit, l->meterNum)) {
+			size_t s = size_t(std::clamp(std::llround(v->frames(sr, bpm)), 0LL, (long long)l->source->frames - 1));
+			m->setCrop({s, std::min(l->source->frames, s + l->crop.length())});
+		}
+	}));
+	menu->addChild(createMenuLabel("Length (empty = to the end)"));
+	menu->addChild(new MenuTextField(spools::formatLength(l->crop.length(), m->cropUnit, sr, bpm), [=](const std::string& t) {
+		auto v = spools::parseLength(t, m->cropUnit, l->meterNum);
+		size_t e = !v ? l->source->frames : l->crop.start + size_t(std::max(1LL, std::llround(v->frames(sr, bpm))));
+		if (v || t.find_first_not_of(" ") == std::string::npos) m->setCrop({l->crop.start, std::min(e, l->source->frames)});
+	}));
+	menu->addChild(createMenuItem("Whole file", "", [=] { m->setCrop({0, l->source->frames}); }));
+}
+
+void tempoMenu(Menu* menu, Spools* m) {
+	auto l = m->loop();
+	if (!l) return;
+	menu->addChild(createMenuLabel(l->bpmKnown ? "Loop BPM" : "Loop BPM (estimated)"));
+	menu->addChild(new MenuTextField(string::f("%.2f", l->bpm), [=](const std::string& t) {
+		char* end = nullptr;
+		double v = std::strtod(t.c_str(), &end);
+		if (end != t.c_str()) m->setLoopBpm(v);
+	}));
+	menu->addChild(createMenuItem("Halve", string::f("%.2f", l->bpm / 2), [=] { m->setLoopBpm(l->bpm / 2); }));
+	menu->addChild(createMenuItem("Double", string::f("%.2f", l->bpm * 2), [=] { m->setLoopBpm(l->bpm * 2); }));
+	TapItem* tap = createMenuItem<TapItem>("Tap tempo");
+	tap->m = m;
+	menu->addChild(tap);
+}
+
 // Each change re-slices right away, so the menu doubles as a preview.
 void slicingMenu(Menu* menu, Spools* m) {
 	auto choice = [=](const char* name, std::vector<std::string> labels, std::vector<double> values, auto get, auto set) {
@@ -136,6 +207,8 @@ struct SpoolsWidget : ModuleWidget {
 			for (int n : {1, 2, 4, 8, 16, 32, 64})
 				sub->addChild(createMenuItem(string::f("%d slices", n), "", [=] { m->sliceEvenly(size_t(n)); }));
 		}));
+		menu->addChild(createSubmenuItem("Crop", "", [=](Menu* sub) { cropMenu(sub, m); }));
+		menu->addChild(createSubmenuItem("Loop tempo", "", [=](Menu* sub) { tempoMenu(sub, m); }));
 		menu->addChild(createSubmenuItem("Auto-slice", "", [=](Menu* sub) { slicingMenu(sub, m); }));
 		static const std::vector<int> ppqns = {1, 2, 4, 8, 24, 48, 96};
 		std::vector<std::string> labels;

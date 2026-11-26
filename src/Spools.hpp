@@ -5,6 +5,7 @@
 #include <string>
 #include "plugin.hpp"
 #include "core/exchange.hpp"
+#include "core/length.hpp"
 #include "core/loop.hpp"
 #include "core/slicing.hpp"
 #include "core/timebase.hpp"
@@ -56,6 +57,8 @@ struct Spools : Module {
 	std::atomic<bool> eco{false};
 	std::atomic<bool> embedAudio{true};
 	spools::SliceSettings slicing;  // UI thread only; workers get a copy
+	spools::CropSpec::Unit cropUnit = spools::CropSpec::Seconds;  // unit shown in the crop fields
+	spools::TapTempo tapTempo;
 
 	// Display feedback from the audio thread.
 	std::atomic<int> playingSlice[kMaxVoices];
@@ -89,6 +92,8 @@ struct Spools : Module {
 	std::shared_ptr<const spools::Loop> loop() { return exchange.latest(); }
 	void sliceEvenly(size_t count);
 	void reslice();  // re-runs auto-slicing with the current settings
+	void setCrop(spools::Range crop);  // plain audio is re-sliced, other files keep their slices inside the crop
+	void setLoopBpm(double bpm);
 
 	int regionIndex(float frac, size_t slices) const;
 };

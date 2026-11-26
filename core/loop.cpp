@@ -161,4 +161,12 @@ std::shared_ptr<Loop> sliceEvenly(const Loop& old, size_t count) {
 	return loop;
 }
 
+std::shared_ptr<Loop> retempo(const Loop& old, double bpm) {
+	auto loop = std::make_shared<Loop>(old);
+	loop->bpm = std::clamp(bpm, 1.0, 999.0);
+	loop->bpmKnown = true;
+	for (auto& s : loop->slices) s.beat = loop->frameToBeat(s.start);
+	return loop;
+}
+
 }

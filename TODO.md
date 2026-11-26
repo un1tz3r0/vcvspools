@@ -17,12 +17,12 @@ Each top-level item is a minor version (`2.N.0`) and one PR to `main`. Each seco
   - [x] 2.2.5 Module glue: params, inputs, outputs, file-load menu, JSON persistence, patch-storage embedding (≤5 min) with *Reference file only* option
   - [x] 2.2.6 Minimal display (waveform, slices, playheads) on a placeholder 36 HP panel
 
-- [ ] **2.3 Analysis and slicing**
+- [x] **2.3 Analysis and slicing**
   - [x] 2.3.1 STFT + spectral-flux onset envelope (in-house FFT)
   - [x] 2.3.2 Onset picking: adaptive threshold, sensitivity, minimum gap, zero-crossing refinement
   - [x] 2.3.3 Tempo estimation (autocorrelation + prior + comb), bar-fit nudge, grid phase (halve/double/tap move to 2.3.5)
   - [x] 2.3.4 Slicing modes (onsets/grid/hybrid) with grid-snap strength; re-slice on the worker when settings change
-  - [ ] 2.3.5 Context-menu crop and BPM text fields
+  - [x] 2.3.5 Context-menu crop and BPM text fields (plus halve/double/tap)
 
 - [ ] **2.4 Tone shaping and parameter resolution**
   - [ ] 2.4.1 TPT SVF (LP/BP/HP/notch 12 dB) + 24 dB LP, V/oct cutoff

@@ -112,12 +112,29 @@ void Spools::reslice() {
 	});
 }
 
+void Spools::setCrop(Range crop) {
+	auto cur = loop();
+	if (!cur) return;
+	worker->post([this, cur, crop, s = slicing] {
+		auto l = recrop(*cur, crop);
+		if (l->origin == Origin::Plain) l = autoSlice(*l, s);
+		publish(l);
+	});
+}
+
+void Spools::setLoopBpm(double bpm) {
+	auto cur = loop();
+	if (!cur || !(bpm > 0)) return;
+	worker->post([this, cur, bpm] { publish(retempo(*cur, bpm)); });
+}
+
 void Spools::onReset(const ResetEvent& e) {
 	Module::onReset(e);
 	ppqn = 1;
 	eco = false;
 	embedAudio = true;
 	slicing = {};
+	cropUnit = CropSpec::Seconds;
 }
 
 void Spools::process(const ProcessArgs& args) {
@@ -252,6 +269,7 @@ json_t* Spools::dataToJson() {
 	json_object_set_new(js, "sensitivity", json_real(slicing.sensitivity));
 	json_object_set_new(js, "snap", json_real(slicing.snap));
 	json_object_set_new(root, "slicing", js);
+	json_object_set_new(root, "cropUnit", json_integer(int(cropUnit)));
 	auto l = loop();
 	if (!l) return root;
 	json_t* j = json_object();
@@ -285,6 +303,7 @@ void Spools::dataFromJson(json_t* root) {
 		if (json_t* x = json_object_get(js, "sensitivity")) slicing.sensitivity = clamp(float(json_number_value(x)), 0.f, 1.f);
 		if (json_t* x = json_object_get(js, "snap")) slicing.snap = clamp(float(json_number_value(x)), 0.f, 1.f);
 	}
+	if (json_t* x = json_object_get(root, "cropUnit")) cropUnit = CropSpec::Unit(clamp(int(json_integer_value(x)), 0, 2));
 	json_t* j = json_object_get(root, "loop");
 	if (!j) return;
 	auto saved = std::make_shared<SavedLoop>();

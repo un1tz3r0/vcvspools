@@ -57,18 +57,16 @@ std::shared_ptr<Loop> autoSlice(const Loop& old, const SliceSettings& s, bool de
 	auto env = old.onsets;
 	if (!env) env = std::make_shared<const OnsetEnvelope>(onsetEnvelope(*old.audio));
 	double bpm = old.bpm, phase = 0;
-	bool known = old.bpmKnown;
-	if (detectTempo && !known) {
+	if (detectTempo && !old.bpmKnown) {
 		TempoEstimate t = estimateTempo(*env, old.audio->seconds(), old.meterNum);
 		bpm = t.bpm;
-		phase = t.phase;
-		known = true;
+		phase = t.phase;  // still an estimate: bpmKnown stays false, so a new crop re-estimates
 	}
 	else if (s.mode != SliceMode::Onsets || s.snap > 0) phase = gridPhase(*env, bpm);
 	if (s.mode != SliceMode::Onsets || s.snap > 0) phase = alignPhase(*old.audio, *env, bpm, phase, s.gridBeats);
 	std::vector<size_t> starts;
 	for (size_t f : computeSlices(*old.audio, *env, bpm, phase, s)) starts.push_back(f + old.crop.start);
-	auto loop = makeLoop(old.source, old.crop, bpm, known, starts, old.origin, old.sourcePath);
+	auto loop = makeLoop(old.source, old.crop, bpm, old.bpmKnown, starts, old.origin, old.sourcePath);
 	loop->meterNum = old.meterNum;
 	loop->meterDen = old.meterDen;
 	loop->onsets = env;
