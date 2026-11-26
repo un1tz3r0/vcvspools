@@ -48,9 +48,9 @@ Each top-level item is a minor version (`2.N.0`) and one PR to `main`. Each seco
   - [x] 2.7.4 Auto-loop point search (period multiples, coherence score, zero-crossing snap)
   - [x] 2.7.5 Granular stretch/squeeze with transient preserve and tail %
 
-- [ ] **2.8 Performance and polish**
+- [x] **2.8 Performance and polish**
   - [x] 2.8.1 `make bench`; eco interpolation; skip idle voices; reach the CPU target
-  - [ ] 2.8.2 User manual in `docs/`, panel screenshots, README update
+  - [x] 2.8.2 User manual in `docs/`, panel screenshots, README update
 
 - [ ] **2.9 Slice remap sequencer (Pattern mode)**
   - [ ] 2.9.1 Pattern model and step playback: order, length/nudge, duration, reverse, pitch

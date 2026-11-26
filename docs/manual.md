@@ -1,6 +1,6 @@
 # Spools manual
 
-Spools is an early proof of concept. See `DESIGN.md` for the planned behaviour and `TODO.md` for progress. This manual grows with each milestone.
+Spools is a loop player and slicer for VCV Rack 2. It plays REX2, Acidized WAV and plain audio loops slice by slice, in time with your clock, with per-slice settings, a filter and envelopes per voice, and tail modes that loop or stretch a slice to fit its time. It is polyphonic: each V/OCT/GATE channel is its own voice, up to 16.
 
 ## Quick start
 
@@ -11,9 +11,13 @@ Spools is an early proof of concept. See `DESIGN.md` for the planned behaviour a
 
 ## Panel
 
+![Panel](images/panel-light.png)
+
 - **Display**: click the tabs along its top to switch pages.
   - **LOOP**: the loop, one colour per slice, with beat and bar lines, a playhead per voice in its slice's colour, and the region marked by an amber bracket (slices outside it are dimmed). The header shows the file, LOOP MODE and REX badges when they apply, the slice count, the length and the current BPM (a `?` means it was guessed).
   - **SLICE**: a close-up of the selected slice (the first one, when several are selected; the playing one when none is). The ‹ › buttons in the tab row step through the slices. It shows the trims, the transient end (dotted line, `T`) and the loop region in amber, faint while automatic and bright once set by hand. Below are the slice's own settings: Pitch, Gain, Pan, Cutoff, Res and Xfade (drag up or down, Shift for fine, double-click to reset), and Reverse, Tail, Loop (Forward or Pingpong) and Points (Auto or Manual), which open a menu when clicked.
+
+    ![SLICE page](images/page-slice.png)
   - **SETTINGS**: every global option: mode, direction, tail, stretch attack and tail amounts, loop crossfade, loop count, envelope retrigger, slicing, clock resolution, bar length, bars per cycle, interpolation quality and audio embedding. Click a row to pick a value. The same options are also in the right-click menu, grouped as Playback, Slicing, Transport and Engine.
 - **Tone strip** (the shaded band under the display): FILTER type (off, low-pass 12 dB, band-pass, high-pass 12 dB, notch, low-pass 24 dB), CUTOFF and RES, each with a CV-amount knob and a CV jack. Cutoff CV is 1 V/oct at 100%; resonance CV is 10 V = 100%. F.ENV sets how far the filter envelope moves the cutoff (±5 octaves). Then come the FILTER ENV and AMP ENV attack, decay, sustain and release knobs (0 to 10 s, exponential).
 - **Main row**: SLICE (start slice), LENGTH, trim IN/OUT, PITCH, LEVEL, XFADE (overlap), DUR (gate length in Cut mode), QUANT (launch quantize), BPM. Each knob with a CV jack has a small CV-amount knob above the jack.
@@ -41,11 +45,7 @@ While slices are selected, IN, OUT, PITCH, LEVEL, XFADE, CUTOFF and RES edit tho
 - **DIRECTION**: forward, reverse, ping-pong (alternating passes) or random.
 - **QUANTIZE** delays triggers to the next 1/32 … 1 bar.
 - **REGION** start/end limit which slices are reachable. Note offsets wrap inside the region.
-- **TAIL** decides what happens when a slice's time slot and its audio differ in length:
-  - *Ring*: the slice plays until the next slice starts or the note ends, and then fades over the overlap time.
-  - *Cut*: the slice is gated off after **DURATION** × its slot (5–100%), with the same fade.
-  - In both modes a slice shorter than its slot just ends, followed by silence.
-  - A slice can have its own tail mode, which wins over the global one.
+- **TAIL** decides what happens when a slice's time slot and its audio differ in length: *Ring*, *Cut*, *Loop*, *Auto-loop* or *Stretch* (see [Tail modes](#tail-modes)). A slice can have its own tail mode, which wins over the global one.
 - **OVERLAP** is how long a slice keeps fading out after the next one starts.
 - **Per-slice settings** add to the knobs: a slice's own pitch, level, pan, trims, cutoff, resonance and crossfade are offsets on top of the knob and CV values. The sums are limited to a usable range (for example ±48 semitones, +12 dB). Pitch, level, cutoff and resonance follow knob and CV changes while a slice plays, with a 5 ms glide. The other settings are read when each slice starts.
 - **Envelopes** restart on each slice by default, so every hit gets its own attack. Set **Retrigger** to *Each note* on the SETTINGS page runs them once per triggered phrase instead. The amp envelope's release starts when the note ends (gate released, or the Cut time is up). A release shorter than OVERLAP uses the overlap fade instead. The default (no attack, full sustain, no release) leaves the sound unchanged.
@@ -58,7 +58,7 @@ RUN, CONT and BAR drive loop mode. RUN is a gate: high runs the loop, and its ri
 
 **Direction**, **Tail** and **Loop count** are on the SETTINGS page (or right-click → **Playback**).
 
-### Tail modes
+## Tail modes
 
 The tail decides what a slice does when its time slot and its audio differ in length. Each slice can override the global tail on the SLICE page.
 
@@ -86,6 +86,24 @@ The SETTINGS page (or right-click → **Slicing**). Every change re-slices at on
 - **Grid snap**: in Onsets mode, moves each hit toward its nearest grid line, from 0% (where it was found) to 100% (on the grid).
 - **Re-slice now** applies the settings to a REX or Acidized file too, replacing its own slices.
 
+## Inputs
+
+Every input is polyphonic; channel *n* drives voice *n*. The CV inputs next to a knob are scaled by the small knob above them.
+
+| Input | |
+|---|---|
+| V/OCT | slice offset: C4 (0 V) plays the start slice, each semitone moves one slice |
+| GATE | starts a phrase on the rising edge; holding it repeats the phrase |
+| CLOCK | tempo, at the clock resolution set on the SETTINGS page |
+| RUN, CONT, BAR | loop-mode transport (see [Transport](#transport)) |
+| SLICE, LENGTH | start slice (10 V spans the region), length (6.4 slices per volt) |
+| IN, OUT | start and end trim, 50 ms per volt |
+| PITCH | 1 V/oct |
+| LEVEL | 10 V adds +2 to the level knob's 0..1 range |
+| XFADE | overlap, 5 ms per volt |
+| QUANT | launch quantize, one step per 1.7 V |
+| CUTOFF, RES | 1 V/oct; 10 V = full resonance |
+
 ## Outputs
 
 | Output | |
@@ -95,6 +113,10 @@ The SETTINGS page (or right-click → **Slicing**). Every change re-slices at on
 | TRIG | 1 ms pulse at each slice start |
 | AENV, FENV | amp and filter envelopes, 0–10 V |
 | EOC | 1 ms pulse at the end of each phrase pass |
+
+## Engine
+
+**Quality** (SETTINGS page): *Best* reads audio with 16-tap windowed-sinc interpolation, *Eco* with 8 taps. Both band-limit when a slice is pitched up. Sixteen voices use about 3–5 % of one core on a 2.1 GHz server CPU (see `docs/development.md`); a voice that has been silent for 0.1 s costs almost nothing.
 
 ## Saving
 

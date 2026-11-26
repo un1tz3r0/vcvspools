@@ -2,6 +2,16 @@
 
 Versions follow `TODO.md`: each `2.N.p` heading is one task, and the last one in a milestone is the released version.
 
+## 2.8.2
+
+- Manual:
+  - an introduction;
+  - an Inputs table with every CV scaling;
+  - a Tail modes section covering all five modes;
+  - an Engine section on interpolation quality and CPU use;
+  - pictures of the panel and the SLICE page.
+- README: a feature summary and images of the panel and the three display pages. The images are 100%-scale previews rendered from the layout code, not Rack screenshots yet. `make bench` is now in the build notes.
+
 ## 2.8.1
 
 - `make bench`: 16 voices at 48 kHz in Ring, Auto-loop and Stretch modes, best and eco quality, with and without a filter, plus an idle case. It uses Rack's optimisation flags and reports % of one core and ns per voice-sample (results in docs/development.md).
