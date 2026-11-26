@@ -29,8 +29,7 @@ Two layers:
 
 ```
 core/   Rack-independent C++17 library: decoding, analysis, slicing, DSP, sequencing.
-        Unit-tested on the host with doctest. Depends only on vendored single-header libs
-        and pffft (vendored copy matching the one in Rack's SDK).
+        Unit-tested on the host with doctest. Depends only on vendored single-header libs.
 src/    Rack module, widgets, panel, JSON persistence. Thin glue over core/.
 ```
 
@@ -93,7 +92,7 @@ Slice beat positions come from the grid (or from REX/Acid metadata). Every timin
 
 Runs on the worker after import or crop, and again when the sensitivity, grid or BPM settings change. Analysis is cached per crop, so re-slicing reuses the onset envelope.
 
-1. **Onset envelope**: mono mix, STFT (1024/256, Hann, pffft), log-magnitude spectral flux, half-wave rectified, then high-pass filtered.
+1. **Onset envelope**: mono mix, STFT (1024/256, Hann, in-house radix-2 FFT), log-magnitude spectral flux, half-wave rectified, then high-pass filtered.
 2. **Onset picking**: adaptive threshold = median over ±N frames + `δ`. `δ` is driven by the *Onset sensitivity* control. A minimum inter-onset gap applies. Each onset is refined to a local energy rise, then to the nearest preceding zero crossing.
 3. **Tempo**: autocorrelation of the onset envelope, weighted by a log-normal prior centred on 120 BPM over 60–200, then a comb-filter bank to pick the octave. If crop duration × BPM is close to a whole number of bars, BPM is nudged to exactly fit (so loops loop). Manual BPM overrides this. *Halve*, *double* and *tap* are menu actions.
 4. **Beat grid**: phase found by cross-correlating an impulse train with the onset envelope, or set to crop start when the crop is bar-aligned (the default).

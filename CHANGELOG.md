@@ -2,6 +2,11 @@
 
 Versions follow `TODO.md`: each `2.N.p` heading is one task, and the last one in a milestone is the released version.
 
+## 2.3.1
+
+- Onset envelope: Hann STFT (1024/256) of the mono mix, log-compressed magnitudes, half-wave rectified spectral flux, and a ~0.1 s moving-average high-pass.
+- Built on a small in-house radix-2 FFT instead of pffft. Analysis runs offline on the worker, so this keeps `core/` dependency-free.
+
 ## 2.2.6
 
 - 36 HP panel with light and dark themes. Labels are drawn with NanoVG at 12 px (≈3 mm caps) so they stay legible at 100% zoom.
