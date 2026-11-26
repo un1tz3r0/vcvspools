@@ -19,6 +19,16 @@ Spools is an early proof of concept. See `DESIGN.md` for the planned behaviour a
 - **FROM** and **TO** (region) sit under DUR and BPM.
 - **Bottom**: V/OCT, GATE, CLOCK, RUN, CONT and BAR inputs; outputs L, R, SLICE, TRIG, EOC, AENV, FENV.
 
+## Editing slices on the LOOP page
+
+- **Select**: click a slice to select it, and click it again to deselect it. Shift- or Ctrl-click adds a slice to the selection or removes it. Click the header or the slice numbers to clear the selection.
+- **Move a boundary**: drag it. It snaps to the slicing grid (SETTINGS → Grid); hold Alt for free movement.
+- **Add or delete**: double-click to add a slice (snapped the same way). Ctrl-double-click a boundary to delete it.
+- **Trim**: a selected slice shows two white triangles along its bottom edge. Drag them to set the slice's own start and end trim.
+- **Region**: drag the amber tabs at the top corners of the bracket. This moves the FROM/TO knobs.
+- **Zoom and scroll**: the scroll wheel zooms around the pointer, and dragging with the middle button scrolls. A bar along the bottom shows where you are.
+- Every edit can be undone with Rack's Undo.
+
 ## Playing slices
 
 - Each trigger plays **LENGTH** slices. Each slice starts on its own beat position, scaled to the current tempo. Pitch is independent of tempo.

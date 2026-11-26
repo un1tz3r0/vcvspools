@@ -167,6 +167,37 @@ void Spools::setLoopBpm(double bpm) {
 	worker->post([this, cur, bpm] { publish(retempo(*cur, bpm)); });
 }
 
+std::vector<size_t>& Spools::selected() {
+	auto l = loop();
+	if (!l || (selectionOf && selectionOf->slices.size() != l->slices.size())) selection.clear();
+	selectionOf = l.get();
+	return selection;
+}
+
+namespace {
+// Undo/redo of a slice-map edit: both versions share their audio, so this costs only the slice lists.
+struct LoopEditAction : history::ModuleAction {
+	std::shared_ptr<const Loop> before, after;
+	void apply(std::shared_ptr<const Loop> l) {
+		if (auto* m = dynamic_cast<Spools*>(APP->engine->getModule(moduleId))) m->publish(l);
+	}
+	void undo() override { apply(before); }
+	void redo() override { apply(after); }
+};
+}
+
+void Spools::commitEdit(std::shared_ptr<const Loop> before, std::shared_ptr<const Loop> after, const std::string& name) {
+	if (!after) return;
+	publish(after);
+	if (!before || before == after) return;
+	auto* h = new LoopEditAction;
+	h->moduleId = id;
+	h->name = name;
+	h->before = before;
+	h->after = after;
+	APP->history->push(h);
+}
+
 void Spools::onReset(const ResetEvent& e) {
 	Module::onReset(e);
 	ppqn = 1;
@@ -349,6 +380,8 @@ json_t* Spools::dataToJson() {
 	json_object_set_new(root, "barsPerCycle", json_integer(barsPerCycle));
 	json_object_set_new(root, "mode", json_integer(playMode));
 	json_object_set_new(root, "displayPage", json_integer(displayPage));
+	json_object_set_new(root, "viewStart", json_real(viewStart));
+	json_object_set_new(root, "viewSpan", json_real(viewSpan));
 	json_t* js = json_object();
 	json_object_set_new(js, "mode", json_integer(int(slicing.mode)));
 	json_object_set_new(js, "gridBeats", json_real(slicing.gridBeats));
@@ -386,6 +419,8 @@ void Spools::dataFromJson(json_t* root) {
 	if (json_t* x = json_object_get(root, "retriggerPerNote")) retriggerPerNote = json_is_true(x);
 	if (json_t* x = json_object_get(root, "barBeats")) barBeats = clamp(float(json_number_value(x)), 0.f, 64.f);
 	if (json_t* x = json_object_get(root, "displayPage")) displayPage = int(json_integer_value(x));
+	if (json_t* x = json_object_get(root, "viewSpan")) viewSpan = clamp(float(json_number_value(x)), 0.001f, 1.f);
+	if (json_t* x = json_object_get(root, "viewStart")) viewStart = clamp(float(json_number_value(x)), 0.f, 1.f - viewSpan);
 	if (json_t* x = json_object_get(root, "mode")) playMode = clamp(int(json_integer_value(x)), 0, 1);
 	if (json_t* x = json_object_get(root, "barsPerCycle")) barsPerCycle = clamp(int(json_integer_value(x)), 0, 64);
 	if (json_t* js = json_object_get(root, "slicing")) {

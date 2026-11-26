@@ -72,7 +72,15 @@ struct Spools : Module {
 	spools::LoopSequencer loopSeqs[kMaxVoices];
 	std::atomic<float> barBeats{0};      // 0 = from the loop's meter
 	std::atomic<int> barsPerCycle{0};
-	int displayPage = 0;  // UI thread    // automatic CONT every N bars; 0 = never
+	// Display state (UI thread).
+	int displayPage = 0;
+	float viewStart = 0, viewSpan = 1;  // visible part of the loop, as fractions of its length
+	std::vector<size_t> selection;      // sorted slice indices
+	const spools::Loop* selectionOf = nullptr;
+	// The selection, emptied when the slice list it refers to has changed shape.
+	std::vector<size_t>& selected();
+	// Publishes an edited loop and records it for undo; `before` is what undo goes back to.
+	void commitEdit(std::shared_ptr<const spools::Loop> before, std::shared_ptr<const spools::Loop> after, const std::string& name);    // automatic CONT every N bars; 0 = never
 	spools::SliceSettings slicing;  // UI thread only; workers get a copy
 	spools::CropSpec::Unit cropUnit = spools::CropSpec::Seconds;  // unit shown in the crop fields
 	spools::TapTempo tapTempo;

@@ -1,6 +1,7 @@
 #include <cmath>
 #include "Page.hpp"
 #include "core/color.hpp"
+#include "core/edit.hpp"
 
 using namespace spools;
 using namespace theme;
@@ -24,8 +25,201 @@ float badge(const DisplayContext& ctx, float right, float baseline, const std::s
 	return right - w;
 }
 
+// Where things are on the page, in page-area coordinates, for drawing and hit-testing alike.
+struct Geometry {
+	float top, bottom, x0, x1;
+	double frames, viewStart, viewSpan;  // view in fractions of the loop
+	Geometry(const DisplayContext& ctx, const Loop& l) {
+		top = kHeader;
+		bottom = ctx.area.size.y - kFooter;
+		x0 = kPad;
+		x1 = ctx.area.size.x - kPad;
+		frames = double(l.audio->frames);
+		viewSpan = ctx.module ? ctx.module->viewSpan : 1;
+		viewStart = ctx.module ? ctx.module->viewStart : 0;
+	}
+	float x(double frame) const { return x0 + float((frame / frames - viewStart) / viewSpan) * (x1 - x0); }
+	double frame(float px) const { return std::clamp((viewStart + double(px - x0) / (x1 - x0) * viewSpan) * frames, 0.0, frames); }
+};
+
+constexpr float kGrab = 4;       // px either side of a boundary that picks it up
+constexpr float kHandleBand = 9; // px at the top (region) and bottom (trims) of the waveform that hold handles
+
 struct LoopPage : Page {
+	enum class Drag { None, Boundary, RegionStart, RegionEnd, TrimStart, TrimEnd, Scroll };
+	Drag drag = Drag::None;
+	size_t dragIndex = 0;
+	std::shared_ptr<const Loop> dragBase, dragResult;
+	float scrollAnchor = 0;
+	float regionBefore[2] = {};
+
 	const char* title() const override { return "LOOP"; }
+
+	static void region(Spools* m, const Loop& l, int& r0, int& rn) {
+		PhraseParams p;
+		const size_t n = l.slices.size();
+		float fs = m->params[Spools::REGION_START_PARAM].getValue(), fe = m->params[Spools::REGION_END_PARAM].getValue();
+		if (fs != 0.f || fe != 1.f) { p.regionStart = m->regionIndex(fs, n); p.regionEnd = m->regionIndex(fe, n); }
+		p.region(l, r0, rn);
+	}
+
+	// Grid snap for edits: the slicing grid at the loop's tempo, off while Alt is held.
+	static size_t snap(Spools* m, const Loop& l, double f) {
+		if ((APP->window->getMods() & GLFW_MOD_ALT) || !m) return size_t(f);
+		double step = m->slicing.gridBeats * 60.0 / l.bpm * l.audio->sampleRate;
+		return size_t(std::max(0.0, std::round(f / step) * step));
+	}
+
+	// Nearest boundary (index >= 1) within kGrab px, or 0.
+	static size_t boundaryAt(const Geometry& g, const Loop& l, float px) {
+		size_t best = 0;
+		float bestD = kGrab;
+		for (size_t i = 1; i < l.slices.size(); i++) {
+			float d = std::fabs(g.x(double(l.slices[i].start)) - px);
+			if (d <= bestD) { bestD = d; best = i; }
+		}
+		return best;
+	}
+
+	static float trimX(const Geometry& g, const Loop& l, size_t i, bool end) {
+		const double sr = l.audio->sampleRate;
+		return end ? g.x(double(l.sliceEnd(i)) - l.slices[i].p.endTrim * sr) : g.x(double(l.slices[i].start) + l.slices[i].p.startTrim * sr);
+	}
+
+	bool onButton(const DisplayContext& ctx, Vec pos, const widget::Widget::ButtonEvent& e) override {
+		Spools* m = ctx.module;
+		if (!m || !ctx.loop || e.action != GLFW_PRESS) return false;
+		const Loop& l = *ctx.loop;
+		Geometry g(ctx, l);
+		dragBase = dragResult = ctx.loop;
+		drag = Drag::None;
+		if (e.button == GLFW_MOUSE_BUTTON_MIDDLE) { drag = Drag::Scroll; scrollAnchor = pos.x; return true; }
+		if (e.button != GLFW_MOUSE_BUTTON_LEFT) return false;
+
+		auto& sel = m->selected();
+		if (pos.y < g.top || pos.y > g.bottom) { sel.clear(); return true; }  // header or footer: clear
+
+		// Region handles along the top edge.
+		int r0, rn;
+		region(m, l, r0, rn);
+		regionBefore[0] = m->params[Spools::REGION_START_PARAM].getValue();
+		regionBefore[1] = m->params[Spools::REGION_END_PARAM].getValue();
+		if (pos.y < g.top + kHandleBand) {
+			float ra = g.x(double(l.slices[size_t(r0)].start)), rb = g.x(double(l.sliceEnd(size_t(r0 + rn - 1))));
+			if (std::fabs(pos.x - ra) <= kGrab * 2) { drag = Drag::RegionStart; return true; }
+			if (std::fabs(pos.x - rb) <= kGrab * 2) { drag = Drag::RegionEnd; return true; }
+		}
+		// Trim handles of selected slices along the bottom edge.
+		if (pos.y > g.bottom - kHandleBand)
+			for (size_t i : sel)
+				for (bool end : {false, true})
+					if (std::fabs(pos.x - trimX(g, l, i, end)) <= kGrab) {
+						drag = end ? Drag::TrimEnd : Drag::TrimStart;
+						dragIndex = i;
+						return true;
+					}
+		if (size_t b = boundaryAt(g, l, pos.x)) { drag = Drag::Boundary; dragIndex = b; return true; }
+
+		// Selection: click toggles; Shift/Ctrl adds to or removes from the selection.
+		size_t i = sliceAt(l, size_t(g.frame(pos.x)));
+		bool multi = APP->window->getMods() & (GLFW_MOD_SHIFT | RACK_MOD_CTRL);
+		auto it = std::find(sel.begin(), sel.end(), i);
+		bool was = it != sel.end();
+		if (!multi) sel.clear();
+		if (was && multi) sel.erase(it);
+		else if (!was) { sel.push_back(i); std::sort(sel.begin(), sel.end()); }
+		return true;
+	}
+
+	bool onDragMove(const DisplayContext& ctx, Vec pos, const widget::Widget::DragMoveEvent& e) override {
+		Spools* m = ctx.module;
+		if (!m || !dragBase || drag == Drag::None) return false;
+		const Loop& l = *dragBase;
+		Geometry g(ctx, l);
+		const double f = g.frame(pos.x), sr = l.audio->sampleRate;
+		switch (drag) {
+			case Drag::Scroll: {
+				float dx = pos.x - scrollAnchor;
+				scrollAnchor = pos.x;
+				m->viewStart = std::clamp(m->viewStart - dx / (g.x1 - g.x0) * m->viewSpan, 0.f, 1.f - m->viewSpan);
+				return true;
+			}
+			case Drag::Boundary:
+				dragResult = moveBoundary(l, dragIndex, snap(m, l, f));
+				break;
+			case Drag::RegionStart:
+			case Drag::RegionEnd: {
+				const size_t n = l.slices.size();
+				size_t i = sliceAt(l, size_t(f + (drag == Drag::RegionEnd ? 0 : sr * 0.001)));
+				int r0, rn;
+				region(m, l, r0, rn);
+				size_t a = drag == Drag::RegionStart ? i : size_t(r0), b = drag == Drag::RegionEnd ? i : size_t(r0 + rn - 1);
+				if (a > b) std::swap(a, b);
+				float d = n > 1 ? float(n - 1) : 1.f;
+				m->params[Spools::REGION_START_PARAM].setValue(float(a) / d);
+				m->params[Spools::REGION_END_PARAM].setValue(float(b) / d);
+				return true;
+			}
+			case Drag::TrimStart:
+			case Drag::TrimEnd: {
+				SliceParams p = l.slices[dragIndex].p;
+				const double len = double(l.sliceEnd(dragIndex) - l.slices[dragIndex].start) / sr;
+				if (drag == Drag::TrimStart) p.startTrim = float(std::clamp((f - double(l.slices[dragIndex].start)) / sr, -0.25, len - 0.002));
+				else p.endTrim = float(std::clamp((double(l.sliceEnd(dragIndex)) - f) / sr, -0.25, len - 0.002));
+				dragResult = setSliceParams(l, {dragIndex}, {p});
+				break;
+			}
+			default: return false;
+		}
+		m->publish(dragResult);
+		return true;
+	}
+
+	void onDragEnd(const DisplayContext& ctx) override {
+		if (ctx.module && dragResult != dragBase && (drag == Drag::Boundary || drag == Drag::TrimStart || drag == Drag::TrimEnd))
+			ctx.module->commitEdit(dragBase, dragResult, drag == Drag::Boundary ? "move slice" : "trim slice");
+		if (ctx.module && (drag == Drag::RegionStart || drag == Drag::RegionEnd)) {
+			auto* all = new history::ComplexAction;
+			all->name = "move region";
+			for (int k = 0; k < 2; k++) {
+				auto* h = new history::ParamChange;
+				h->moduleId = ctx.module->id;
+				h->paramId = k ? Spools::REGION_END_PARAM : Spools::REGION_START_PARAM;
+				h->oldValue = regionBefore[k];
+				h->newValue = ctx.module->params[h->paramId].getValue();
+				all->push(h);
+			}
+			APP->history->push(all);
+		}
+		drag = Drag::None;
+		dragBase = dragResult = nullptr;
+	}
+
+	// Double-click adds a slice; Ctrl-double-click on a boundary removes it.
+	void onDoubleClick(const DisplayContext& ctx, Vec pos) override {
+		Spools* m = ctx.module;
+		if (!m || !ctx.loop || pos.y < kHeader) return;
+		const Loop& l = *ctx.loop;
+		Geometry g(ctx, l);
+		if (APP->window->getMods() & RACK_MOD_CTRL) {
+			if (size_t b = boundaryAt(g, l, pos.x)) m->commitEdit(ctx.loop, removeSlice(l, b), "delete slice");
+			return;
+		}
+		auto next = addSlice(l, snap(m, l, g.frame(pos.x)));
+		if (next->slices.size() != l.slices.size()) m->commitEdit(ctx.loop, next, "add slice");
+	}
+
+	// Scroll zooms around the pointer.
+	bool onHoverScroll(const DisplayContext& ctx, Vec pos, const widget::Widget::HoverScrollEvent& e) override {
+		Spools* m = ctx.module;
+		if (!m || !ctx.loop || e.scrollDelta.y == 0) return false;
+		Geometry g(ctx, *ctx.loop);
+		float at = m->viewStart + (pos.x - g.x0) / (g.x1 - g.x0) * m->viewSpan;
+		float span = std::clamp(m->viewSpan * std::pow(0.85f, e.scrollDelta.y / 50.f), 0.002f, 1.f);
+		m->viewStart = std::clamp(at - (pos.x - g.x0) / (g.x1 - g.x0) * span, 0.f, 1.f - span);
+		m->viewSpan = span;
+		return true;
+	}
 
 	void draw(const DisplayContext& ctx) override {
 		NVGcontext* vg = ctx.vg;
@@ -72,17 +266,15 @@ struct LoopPage : Page {
 		std::string err = module->getStatus();
 		if (!err.empty()) ctx.text(ax + w / 2, hy, NVG_ALIGN_CENTER | NVG_ALIGN_BASELINE, kBody, kText, "⚠ " + err);
 
-		const float top = ay + kHeader, bottom = ay + h - kFooter, mid = (top + bottom) / 2, amp = (bottom - top) / 2 - 2;
-		const float x0 = ax + kPad, x1 = ax + w - kPad, span = x1 - x0;
-		auto frameX = [&](double f) { return x0 + float(f / double(a.frames)) * span; };
+		const Geometry g(ctx, *loop);
+		const float top = ay + g.top, bottom = ay + g.bottom, mid = (top + bottom) / 2, amp = (bottom - top) / 2 - 2;
+		const float x0 = ax + g.x0, x1 = ax + g.x1;
+		auto frameX = [&](double f) { return ax + g.x(f); };
+		nvgSave(vg);
+		nvgIntersectScissor(vg, x0, ay, x1 - x0, h);
 
 		int r0 = 0, rn = int(n);
-		{
-			PhraseParams p;
-			float fs = module->params[Spools::REGION_START_PARAM].getValue(), fe = module->params[Spools::REGION_END_PARAM].getValue();
-			if (fs != 0.f || fe != 1.f) { p.regionStart = module->regionIndex(fs, n); p.regionEnd = module->regionIndex(fe, n); }
-			p.region(*loop, r0, rn);
-		}
+		region(module, *loop, r0, rn);
 		auto inRegion = [&](size_t i) { return int(i) >= r0 && int(i) < r0 + rn; };
 		for (size_t i = 0; i < n; i++) {
 			float xa = frameX(double(loop->slices[i].start)), xb = frameX(double(loop->sliceEnd(i)));
@@ -92,7 +284,7 @@ struct LoopPage : Page {
 		// Beat and bar grid at the loop's own tempo.
 		const double framesPerBeat = a.sampleRate * 60.0 / loop->bpm;
 		const int beatsPerBar = std::max(1, loop->meterNum * 4 / std::max(1, loop->meterDen));
-		if (framesPerBeat / a.frames * span >= 4)
+		if (frameX(framesPerBeat) - frameX(0) >= 4)
 			for (int b = 1; b * framesPerBeat < a.frames; b++) {
 				bool bar = b % beatsPerBar == 0;
 				ctx.fillRect(std::round(frameX(b * framesPerBeat)), top, 1, bottom - top, nvgRGBA(0xff, 0xff, 0xff, bar ? 0x38 : 0x14));
@@ -101,22 +293,46 @@ struct LoopPage : Page {
 		// Waveform: one min/max bar per pixel, coloured by slice.
 		size_t si = 0;
 		for (float x = x0; x < x1; x += 1.f) {
-			size_t f0 = size_t(double(x - x0) / span * a.frames), f1 = std::max(f0 + 1, size_t(double(x + 1 - x0) / span * a.frames));
+			size_t f0 = size_t(g.frame(x - ax)), f1 = std::max(f0 + 1, size_t(g.frame(x + 1 - ax)));
 			while (si + 1 < n && loop->slices[si + 1].start <= f0) si++;
 			float lo = 0, hi = 0;
 			for (int c = 0; c < a.channels; c++) {
-				auto pk = loop->mips.peak(c, f0, f1, a);
+				auto pk = loop->mips->peak(c, f0, f1, a);
 				lo = std::min(lo, pk.lo);
 				hi = std::max(hi, pk.hi);
 			}
 			ctx.fillRect(x, mid - clamp(hi, -1.f, 1.f) * amp, 1.f, std::max(1.f, (hi - lo) * amp), withAlpha(hue[si], inRegion(si) ? 0.95f : 0.30f));
 		}
 
-		// Region brackets.
-		if (rn < int(n)) {
+		// Region bracket, with grab tabs at its top corners.
+		{
 			float ra = frameX(double(loop->slices[size_t(r0)].start)), rb = frameX(double(loop->sliceEnd(size_t(r0 + rn - 1))));
-			for (float x : {ra, rb - 2}) ctx.fillRect(x, top, 2, bottom - top, withAlpha(kAccent, 0.9f));
-			ctx.fillRect(ra, top, rb - ra, 2, withAlpha(kAccent, 0.9f));
+			NVGcolor c = withAlpha(kAccent, rn < int(n) ? 0.9f : 0.45f);
+			for (float x : {ra, rb - 2}) ctx.fillRect(x, top, 2, bottom - top, c);
+			ctx.fillRect(ra, top, rb - ra, 2, c);
+			ctx.fillRect(ra, top, 6, 7, c);
+			ctx.fillRect(rb - 6, top, 6, 7, c);
+		}
+
+		// Selected slices: outline plus trim handles along the bottom.
+		for (size_t i : module->selected()) {
+			if (i >= n) continue;
+			float xa = frameX(double(loop->slices[i].start)), xb = frameX(double(loop->sliceEnd(i)));
+			nvgBeginPath(vg);
+			nvgRect(vg, xa + 1, top + 1, xb - xa - 2, bottom - top - 2);
+			nvgStrokeColor(vg, kText);
+			nvgStrokeWidth(vg, 2);
+			nvgStroke(vg);
+			for (bool end : {false, true}) {
+				float tx = ax + trimX(g, *loop, i, end);
+				nvgBeginPath(vg);
+				nvgMoveTo(vg, tx, bottom - kHandleBand);
+				nvgLineTo(vg, tx, bottom);
+				nvgLineTo(vg, end ? tx - 7 : tx + 7, bottom);
+				nvgClosePath(vg);
+				nvgFillColor(vg, kText);
+				nvgFill(vg);
+			}
 		}
 
 		// Slice boundaries with index labels.
@@ -141,6 +357,13 @@ struct LoopPage : Page {
 			ctx.fillRect(frameX(pos) - 1, top, 2, bottom - top, hue[size_t(s)]);
 			float sa = frameX(double(loop->slices[size_t(s)].start));
 			ctx.fillRect(sa, bottom - 3, frameX(double(loop->sliceEnd(size_t(s)))) - sa, 3, hue[size_t(s)]);
+		}
+		nvgRestore(vg);
+
+		// Zoomed: a scroll bar under the slice numbers shows which part is visible.
+		if (g.viewSpan < 1) {
+			ctx.fillRect(x0, ay + h - 2, x1 - x0, 2, nvgRGBA(0xff, 0xff, 0xff, 0x20));
+			ctx.fillRect(x0 + float(g.viewStart) * (x1 - x0), ay + h - 2, float(g.viewSpan) * (x1 - x0), 2, kDim);
 		}
 	}
 };

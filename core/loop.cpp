@@ -88,7 +88,9 @@ std::shared_ptr<Loop> makeLoop(std::shared_ptr<const Audio> source, Range crop, 
 	for (size_t s : starts) loop->slices.push_back({s, loop->frameToBeat(s), {}});
 	loop->regionStart = 0;
 	loop->regionEnd = loop->slices.size() - 1;
-	loop->mips.build(*audio);
+	auto mips = std::make_shared<WaveformMips>();
+	mips->build(*audio);
+	loop->mips = mips;
 	return loop;
 }
 

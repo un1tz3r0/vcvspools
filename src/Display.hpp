@@ -16,6 +16,8 @@ struct SpoolsDisplay : widget::OpaqueWidget {
 	void onDragStart(const DragStartEvent& e) override;
 	void onDragMove(const DragMoveEvent& e) override;
 	void onHoverScroll(const HoverScrollEvent& e) override;
+	void onDragEnd(const DragEndEvent& e) override;
+	void onDoubleClick(const DoubleClickEvent& e) override;
 
 private:
 	Vec dragPos;

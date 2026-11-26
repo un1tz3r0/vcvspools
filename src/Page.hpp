@@ -39,6 +39,8 @@ struct Page {
 	virtual bool onButton(const DisplayContext&, Vec, const widget::Widget::ButtonEvent&) { return false; }
 	virtual bool onDragMove(const DisplayContext&, Vec, const widget::Widget::DragMoveEvent&) { return false; }
 	virtual bool onHoverScroll(const DisplayContext&, Vec, const widget::Widget::HoverScrollEvent&) { return false; }
+	virtual void onDragEnd(const DisplayContext&) {}
+	virtual void onDoubleClick(const DisplayContext&, Vec) {}
 };
 
 std::unique_ptr<Page> makeLoopPage();

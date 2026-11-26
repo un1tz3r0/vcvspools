@@ -60,17 +60,17 @@ void SpoolsDisplay::drawLayer(const DrawArgs& args, int layer) {
 }
 
 void SpoolsDisplay::onButton(const ButtonEvent& e) {
-	OpaqueWidget::onButton(e);
+	if (e.button == GLFW_MOUSE_BUTTON_RIGHT) return;  // leave right-clicks to the module's context menu
 	if (e.action == GLFW_PRESS) dragPos = e.pos;
+	e.consume(this);  // owning the press is what lets this widget receive the drag
 	if (e.pos.y < kTabH) {
 		if (e.action == GLFW_PRESS && e.button == GLFW_MOUSE_BUTTON_LEFT)
 			for (int i = 0; i < int(pages.size()); i++)
 				if (e.pos.x >= tabRight(i) - kTabW && e.pos.x < tabRight(i)) current() = i;
-		e.consume(this);
 		return;
 	}
 	DisplayContext ctx = context();
-	if (pages[current()]->onButton(ctx, e.pos.minus(ctx.area.pos), e)) e.consume(this);
+	pages[current()]->onButton(ctx, e.pos.minus(ctx.area.pos), e);
 }
 
 void SpoolsDisplay::onDragStart(const DragStartEvent& e) {}  // dragPos was set by the press in onButton
@@ -85,4 +85,12 @@ void SpoolsDisplay::onHoverScroll(const HoverScrollEvent& e) {
 	DisplayContext ctx = context();
 	if (pages[current()]->onHoverScroll(ctx, e.pos.minus(ctx.area.pos), e)) e.consume(this);
 	else OpaqueWidget::onHoverScroll(e);
+}
+
+void SpoolsDisplay::onDragEnd(const DragEndEvent& e) { pages[current()]->onDragEnd(context()); }
+
+void SpoolsDisplay::onDoubleClick(const DoubleClickEvent& e) {
+	if (dragPos.y < kTabH) return;
+	DisplayContext ctx = context();
+	pages[current()]->onDoubleClick(ctx, dragPos.minus(ctx.area.pos));
 }

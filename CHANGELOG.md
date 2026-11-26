@@ -2,6 +2,14 @@
 
 Versions follow `TODO.md`: each `2.N.p` heading is one task, and the last one in a milestone is the released version.
 
+## 2.6.4
+
+- Mouse editing on the LOOP page: select, deselect and multi-select slices; drag boundaries with grid snap (Alt for free); double-click to add a slice and Ctrl-double-click to delete one; drag per-slice trim handles; drag region handles, which set FROM/TO; scroll-wheel zoom around the pointer; middle-drag to scroll, with a position bar.
+- Slice-map edits (`core/edit.hpp`: move, add, remove, region, per-slice settings) return a new loop that shares the audio, waveform mips and analysis of the old one. The mips are now shared between loops, so undo history costs only the slice lists.
+- Undo and redo through Rack's history for every edit, including region drags.
+- View zoom and position are saved with the patch. The selection is not saved.
+- Right-clicks on the display open the module menu again.
+
 ## 2.6.3
 
 - LOOP page drawing: slice colours are evenly spaced OKLCH hues at equal lightness, with alternate slices on opposite halves of the circle so neighbours never look alike (`core/color.hpp`). Beat and bar grid at the loop's own tempo. The region gets an amber bracket and the slices outside it are dimmed. Each playhead and its slice marker take that slice's colour.

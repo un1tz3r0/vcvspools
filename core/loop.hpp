@@ -63,7 +63,7 @@ struct Loop {
 	int meterNum = 4, meterDen = 4;
 	std::vector<Slice> slices;          // sorted, slices[0].start == 0
 	size_t regionStart = 0, regionEnd = 0;  // slice indices, inclusive
-	WaveformMips mips;
+	std::shared_ptr<const WaveformMips> mips;  // shared by slice edits of the same crop
 	std::shared_ptr<const OnsetEnvelope> onsets;  // cached analysis of `audio`, or null
 
 	size_t sliceEnd(size_t i) const { return i + 1 < slices.size() ? slices[i + 1].start : audio->frames; }
