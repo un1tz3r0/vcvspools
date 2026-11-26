@@ -118,3 +118,27 @@ TEST_CASE("replacing the loop drops players that point at the old audio") {
 	VoiceOut o = v.process(1000 / 12000.0, 0.25, false, false, 0, *b, p, {}, 48000);
 	CHECK_FALSE(o.playing);
 }
+
+TEST_CASE("the voice filter follows global and per-slice cutoff") {
+	auto loop = steps();
+	auto l = std::make_shared<Loop>(*loop);
+	auto noise = std::make_shared<Audio>(*l->audio);
+	uint32_t seed = 1;
+	for (auto& x : noise->data[0]) x = float((seed = seed * 1664525u + 1013904223u) >> 8) / 16777216.f - 0.5f;
+	l->audio = noise;
+	l->slices[1].p.cutoff = -4;  // a dull second slice
+	PhraseParams p;
+	p.length = 2;
+	auto energy = [](const Run& r, size_t a, size_t b) { double e = 0; for (size_t i = a; i < b; i++) e += r.l[i] * r.l[i]; return e; };
+	Voice v0, v1;
+	VoiceParams open, lp;
+	lp.filter = FilterType::LP12;
+	lp.cutoff = 3;  // ~2.1 kHz
+	auto dry = render(v0, *l, p, open, 0.25, 24000);
+	auto wet = render(v1, *l, p, lp, 0.25, 24000);
+	double d0 = energy(dry, 1000, 11000), w0 = energy(wet, 1000, 11000);
+	double d1 = energy(dry, 13000, 23000), w1 = energy(wet, 13000, 23000);
+	CHECK(w0 / d0 < 0.2);
+	CHECK(w0 / d0 > 0.02);
+	CHECK(w1 / d1 < w0 / d0 * 0.2);
+}

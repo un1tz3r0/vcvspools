@@ -37,6 +37,13 @@ Spools::Spools() {
 	configInput(LENGTH_INPUT, "Length CV");
 	configInput(START_TRIM_INPUT, "Start trim CV");
 	configInput(END_TRIM_INPUT, "End trim CV");
+	configSwitch(FILTER_TYPE_PARAM, 0.f, 5.f, 0.f, "Filter", {"Off", "Low-pass 12 dB", "Band-pass", "High-pass 12 dB", "Notch", "Low-pass 24 dB"});
+	configParam(CUTOFF_PARAM, -4.f, 6.f, 6.f, "Cutoff", " Hz", 2.f, 261.6256f);
+	configParam(RES_PARAM, 0.f, 1.f, 0.f, "Resonance", "%", 0.f, 100.f);
+	configParam(CUTOFF_ATT_PARAM, -1.f, 1.f, 0.f, "Cutoff CV amount", "%", 0.f, 100.f);
+	configParam(RES_ATT_PARAM, -1.f, 1.f, 0.f, "Resonance CV amount", "%", 0.f, 100.f);
+	configInput(CUTOFF_INPUT, "Cutoff CV (1 V/oct at 100%)");
+	configInput(RES_INPUT, "Resonance CV (10 V = 100%)");
 	configInput(PITCH_INPUT, "Pitch CV (1 V/oct)");
 	configInput(VOLUME_INPUT, "Volume CV");
 	configInput(OVERLAP_INPUT, "Overlap CV");
@@ -170,6 +177,7 @@ void Spools::process(const ProcessArgs& args) {
 	vp.tail = params[TAIL_PARAM].getValue() > 0.5f ? TailMode::Cut : TailMode::Ring;
 	vp.duration = params[DURATION_PARAM].getValue();
 	vp.quality = eco ? &SincTable::eco() : &SincTable::hq();
+	vp.filter = FilterType(int(params[FILTER_TYPE_PARAM].getValue()));
 
 	const double beat = timebase.phase(), period = timebase.beatPeriod();
 	for (int c = 0; c < channels; c++) {
@@ -186,6 +194,8 @@ void Spools::process(const ProcessArgs& args) {
 		vp.pitch = params[PITCH_PARAM].getValue() + cv(PITCH_INPUT, PITCH_ATT_PARAM, c) * 12.f;
 		float vol = std::max(0.f, params[VOLUME_PARAM].getValue() + cv(VOLUME_INPUT, VOLUME_ATT_PARAM, c) * 0.2f);
 		vp.gain = 20.f * std::log10(std::max(vol, 1e-5f));
+		vp.cutoff = params[CUTOFF_PARAM].getValue() + cv(CUTOFF_INPUT, CUTOFF_ATT_PARAM, c);
+		vp.res = clamp(params[RES_PARAM].getValue() + cv(RES_INPUT, RES_ATT_PARAM, c) * 0.1f, 0.f, 1.f);
 		vp.overlap = clamp(params[OVERLAP_PARAM].getValue() + cv(OVERLAP_INPUT, OVERLAP_ATT_PARAM, c) * 0.005f, 0.f, 0.1f);
 
 		float gateV = inputs[GATE_INPUT].getVoltage(c);

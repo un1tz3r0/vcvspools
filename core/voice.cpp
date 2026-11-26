@@ -10,6 +10,8 @@ void Voice::reset() {
 	players[0].kill();
 	players[1].kill();
 	lastSlice = -1;
+	filter.reset();
+	filterCountdown = 0;
 }
 
 void Voice::begin(int slice, double slotSeconds, const Loop& l, const VoiceParams& vp, float engineRate) {
@@ -73,8 +75,13 @@ VoiceOut Voice::process(double beat, double beatPeriod, bool gate, bool rising, 
 		l0 += a * gainL[k];
 		r0 += b * gainR[k];
 	}
-	out.left = l0;
-	out.right = r0;
+	if (--filterCountdown <= 0) {
+		const SliceParams* sp = lastSlice >= 0 ? &l.slices[size_t(lastSlice)].p : nullptr;
+		filter.set(vp.filter, vp.cutoff + (sp ? sp->cutoff : 0.f), vp.res + (sp ? sp->res : 0.f), engineRate);
+		filterCountdown = kFilterEvery;
+	}
+	out.left = filter.process(0, l0);
+	out.right = filter.process(1, r0);
 	out.slice = lastSlice;
 	out.playing = players[0].active() || players[1].active();
 	return out;

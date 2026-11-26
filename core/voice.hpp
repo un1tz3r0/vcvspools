@@ -1,4 +1,5 @@
 #pragma once
+#include "filter.hpp"
 #include "loop.hpp"
 #include "sequencer.hpp"
 #include "sliceplayer.hpp"
@@ -15,6 +16,9 @@ struct VoiceParams {
 	float duration = 1;                // fraction of the slot a slice is gated for (Cut mode)
 	bool reverse = false;
 	TailMode tail = TailMode::Ring;
+	FilterType filter = FilterType::Off;
+	float cutoff = 6;                  // V/oct around C4
+	float res = 0;                     // 0..1
 	const SincTable* quality = &SincTable::hq();
 };
 
@@ -41,6 +45,9 @@ private:
 	float gainL[2] = {1, 1}, gainR[2] = {1, 1}, pitch = 0, rateBase = 0;
 	bool released = false;
 	const Loop* loop = nullptr;
+	VoiceFilter filter;
+	int filterCountdown = 0;  // coefficients are refreshed every kFilterEvery samples
+	static constexpr int kFilterEvery = 4;
 
 	void begin(int slice, double slotSeconds, const Loop& l, const VoiceParams& vp, float engineRate);
 };

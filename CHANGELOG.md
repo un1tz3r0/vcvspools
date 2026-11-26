@@ -2,6 +2,12 @@
 
 Versions follow `TODO.md`: each `2.N.p` heading is one task, and the last one in a milestone is the released version.
 
+## 2.4.1
+
+- Per-voice stereo filter: zero-delay-feedback state-variable filter with 12 dB low-pass, band-pass (unity at the peak), high-pass and notch, plus a 24 dB low-pass made of two stages tuned as a 4-pole Butterworth, with resonance on the second stage. Coefficients are updated every 4 samples.
+- Cutoff in V/oct around C4 (16 Hz to 16.7 kHz on the knob, 10 Hz to 0.49 × sample rate with CV), resonance 0–100 %. Per-slice cutoff and resonance offsets are added.
+- FILTER, CUTOFF and RES controls with CV in a strip under the display, which is now shorter. This layout is temporary until the final panel (2.6.1).
+
 ## 2.3.5
 
 - **Crop** submenu: start and length text fields that accept `s`, `ms`, `b`, `bars` and `smp` suffixes, a default-unit choice, and *Whole file*. Plain audio is re-sliced and its tempo re-estimated after a crop.

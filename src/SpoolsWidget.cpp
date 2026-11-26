@@ -5,6 +5,8 @@
 namespace {
 
 // Layout in panel px (36 HP = 540 x 380). Row 1 is the main knob row; CV and its amount sit below each knob.
+// The strip between the display and the main row holds the tone controls.
+constexpr float kDisplayH = 94, kStripY = 142, kStripLabelY = 124, kStripStep = 30, kStripGap = 6;
 constexpr float kCol0 = 39, kColStep = 51, kRow1 = 222, kAttY = 258, kCvY = 288, kBottomY = 352;
 float col(int i) { return kCol0 + kColStep * i; }
 
@@ -141,7 +143,7 @@ struct SpoolsWidget : ModuleWidget {
 		auto* display = new SpoolsDisplay;
 		display->module = module;
 		display->box.pos = Vec(12, 16);
-		display->box.size = Vec(516, 164);
+		display->box.size = Vec(516, kDisplayH);
 		addChild(display);
 
 		auto* labels = new PanelLabels;
@@ -174,6 +176,21 @@ struct SpoolsWidget : ModuleWidget {
 		labels->labels.push_back({col(7), kCvY + 22, "RING"});
 		addParam(createParamCentered<RoundSmallBlackKnob>(Vec(col(9), kCvY - 6), module, S::DIRECTION_PARAM));
 		labels->labels.push_back({col(9), kAttY - 2, "DIR"});
+
+		// Tone strip: groups of controls with one label centred over each group.
+		float x = 28;
+		auto group = [&](const char* label, std::vector<std::function<void(Vec)>> items) {
+			float x0 = x;
+			for (auto& add : items) { add(Vec(x, kStripY)); x += kStripStep; }
+			labels->labels.push_back({(x0 + x - kStripStep) / 2, kStripLabelY, label});
+			x += kStripGap;
+		};
+		auto knob = [&](int id) { return [=](Vec p) { addParam(createParamCentered<RoundSmallBlackKnob>(p, module, id)); }; };
+		auto trim = [&](int id) { return [=](Vec p) { addParam(createParamCentered<Trimpot>(p, module, id)); }; };
+		auto jack = [&](int id) { return [=](Vec p) { addInput(createInputCentered<ThemedPJ301MPort>(p, module, id)); }; };
+		group("FILTER", {knob(S::FILTER_TYPE_PARAM)});
+		group("CUTOFF", {knob(S::CUTOFF_PARAM), trim(S::CUTOFF_ATT_PARAM), jack(S::CUTOFF_INPUT)});
+		group("RES", {knob(S::RES_PARAM), trim(S::RES_ATT_PARAM), jack(S::RES_INPUT)});
 
 		const float inX[] = {40, 92, 144};
 		const int ins[] = {S::VOCT_INPUT, S::GATE_INPUT, S::CLOCK_INPUT};
